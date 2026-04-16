@@ -1,0 +1,7 @@
+{
+    "name": "crucible-tools",
+    "version": "1.0.0",
+    "description": "Development tools for the crucible performance testing framework",
+    "author": { "name": "perftool-incubator" },
+    "license": "Apache-2.0"
+}
