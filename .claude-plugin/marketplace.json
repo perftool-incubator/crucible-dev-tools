@@ -1,0 +1,14 @@
+{
+    "name": "crucible-dev-tools",
+    "description": "Development tools for the crucible performance testing framework",
+    "owner": {
+        "name": "perftool-incubator"
+    },
+    "plugins": [
+        {
+            "name": "crucible-tools",
+            "description": "Development tools for the crucible performance testing framework",
+            "source": "./plugins/crucible-tools"
+        }
+    ]
+}

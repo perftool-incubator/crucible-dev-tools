@@ -4,14 +4,14 @@ Claude Code plugin providing development tools for the [crucible](https://github
 
 ## Installation
 
-This plugin is automatically available when working in the crucible project. Run `crucible update` to clone it, then accept the plugin prompt when opening crucible in Claude Code.
-
-For manual installation:
+New crucible installations include this repo as a subproject. For existing
+installs, run `crucible update` first. Then register the plugin marketplace:
 
 ```
-/plugin marketplace add perftool-incubator/crucible-dev-tools
-/plugin install crucible-tools@crucible-dev-tools
+claude plugin marketplace add ${CRUCIBLE_HOME}/subprojects/core/crucible-dev-tools
 ```
+
+Claude Code will prompt you to install the crucible-tools plugin — accept it.
 
 ## Skills
 
