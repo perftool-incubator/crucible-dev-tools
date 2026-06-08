@@ -12,7 +12,7 @@ Arguments: $ARGUMENTS
    - A number sets the weeks (e.g., `/crucible-tools:dev-activity 26` for 26 weeks)
    - No arguments defaults to 52 weeks
 
-2. Run `dev-activity.py --weeks <N> --output /tmp/dev-activity.html`
+2. Run `../../bin/dev-activity.py --weeks <N> --output /tmp/dev-activity.html` (relative to this skill directory)
 
 3. Tell the user the report was written to `/tmp/dev-activity.html` and they can open it in a browser.
    The report contains charts for:
