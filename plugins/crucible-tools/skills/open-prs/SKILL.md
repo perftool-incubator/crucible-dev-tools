@@ -12,7 +12,7 @@ Arguments: $ARGUMENTS
    - If a username is provided (e.g., `/crucible-tools:open-prs k-rister`), pass `--author <username>` to the script
    - If no arguments or `--all`, run the script with no author filter
 
-2. Run `open-prs.py [--author <username>]` to collect open PRs.
+2. Run `../../bin/open-prs.py [--author <username>]` (relative to this skill directory) to collect open PRs.
 
 3. The script outputs pipe-delimited rows: `repo|#number|title|url|created_date|author|merge_status|review_status`. If no open PRs, it prints "No open PRs".
 

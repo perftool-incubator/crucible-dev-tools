@@ -6,7 +6,7 @@ Show the local git status for all crucible repos.
 
 ## Instructions
 
-1. Run `repo-status.py` to collect repo status.
+1. Run the script at `../../bin/repo-status.py` (relative to this skill directory) to collect repo status.
 
 2. The script reads `config/repos.json` and outputs pipe-delimited rows for repos that have something noteworthy (not clean, not on default branch, or has extra local branches). Repos that are clean on their default branch with no extra branches are omitted.
 

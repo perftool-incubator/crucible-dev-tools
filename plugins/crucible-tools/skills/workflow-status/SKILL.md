@@ -14,7 +14,7 @@ Arguments: $ARGUMENTS
    - `--no-runners`: pass through to skip runner summary
    - No arguments: show all crucible repos with runner summary
 
-2. Run `workflow-status.py [--repo <name>] [--no-runners]` to collect workflow status. Always use the default raw format (do not pass `--format`). The script also supports `--format pretty` for direct terminal use but that is not used by this skill.
+2. Run `../../bin/workflow-status.py [--repo <name>] [--no-runners]` (relative to this skill directory) to collect workflow status. Always use the default raw format (do not pass `--format`). The script also supports `--format pretty` for direct terminal use but that is not used by this skill.
 
 3. The script outputs prefixed pipe-delimited rows to stdout. Parse by row type:
 
