@@ -58,13 +58,26 @@ Arguments: $ARGUMENTS
    done
    ```
 
-5. Write the summary to `/tmp/activity-summary.html` as an HTML file formatted for easy copy-paste into Google Docs:
+5. **Jira tickets (optional):** If a Jira MCP server is available (check for tools with names starting with `mcp__jira__`), collect tickets updated or created during the date range:
+
+   - Search for tickets assigned to the current user that were created or updated in the date range:
+     ```
+     mcp__jira__search-issues with jql: "project = PERFNFV AND assignee = currentUser() AND (created >= \"${since_date}\" OR updated >= \"${since_date}\") ORDER BY updated DESC"
+     ```
+   - For each ticket, note: key, summary, status, and type
+   - Include these in the summary output under a **Jira tickets** section, with links to each ticket
+   - When writing the **Key themes** section, associate Jira tickets with their related PRs where the connection is apparent (e.g., PR title or description references the ticket)
+
+   If no Jira MCP server is available, skip this step entirely — do not error or warn.
+
+6. Write the summary to `/tmp/activity-summary.html` as an HTML file formatted for easy copy-paste into Google Docs:
    - Use plain text styling only — bold (`<b>`) for labels, `<p>` for paragraphs, `<ul>`/`<li>` for lists, `<br>` for line breaks. No headings (`<h1>`-`<h6>`), no `<code>` tags.
    - Use `<a href="...">` for all PR/issue references so they paste as clickable links in Google Docs.
    - Sections:
      - **Headline**: "Activity Summary — perftool-incubator (date range)"
      - **Stats line**: PRs authored, merged, open, reviewed
-     - **Key themes**: Group related PRs by theme/category (e.g., "CI modernization", "bug fixes", "documentation", "new features"). Describe what was accomplished in each theme in 1-2 sentences. Include PR links.
+     - **Key themes**: Group related PRs by theme/category (e.g., "CI modernization", "bug fixes", "documentation", "new features"). Describe what was accomplished in each theme in 1-2 sentences. Include PR links and Jira ticket references where applicable.
+     - **Jira tickets** (if available): List tickets with key, summary, status, and links
      - **Commits by repo**: One line showing repo (count) sorted by count descending, with total
      - **Still open**: List any open PRs with links
      - **Reviews**: List any PRs reviewed for others with links
