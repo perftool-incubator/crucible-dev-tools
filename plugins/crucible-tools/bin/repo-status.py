@@ -43,7 +43,6 @@ def main():
         repos.append((name, rtype, path, default_branch))
 
     results = []
-    has_other_branches = False
 
     for name, rtype, path, default_branch in repos:
         if not os.path.isdir(path):
@@ -54,8 +53,6 @@ def main():
         all_branches = git(path, "branch").splitlines()
         others = [b.strip().lstrip("* ") for b in all_branches if not b.startswith("*")]
         other_str = ", ".join(others) if others else ""
-        if other_str:
-            has_other_branches = True
 
         status_lines = git(path, "status", "--short", "-u").splitlines()
         status_lines = [l for l in status_lines if "__pycache__" not in l and not l.endswith(".pyc")]
