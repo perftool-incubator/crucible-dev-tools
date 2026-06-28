@@ -17,10 +17,14 @@ Claude Code will prompt you to install the crucible-tools plugin — accept it.
 
 | Skill | Description |
 |-------|-------------|
-| `/crucible-tools:repo-status` | Show git status across all crucible repos |
-| `/crucible-tools:open-prs` | Show open PRs in the org (optionally filter by author) |
-| `/crucible-tools:dev-activity` | Generate development activity charts (commits, PRs, workflow runs) |
-| `/crucible-tools:weekly-summary` | Generate a weekly activity summary with PR links |
+| `/crucible-tools:activity-summary` | Generate an activity summary for the perftool-incubator GitHub organization |
+| `/crucible-tools:debug-log` | Analyze crucible logs to debug failed runs or commands |
+| `/crucible-tools:dev-activity` | Generate development activity charts for the perftool-incubator GitHub organization |
+| `/crucible-tools:image-cleanup` | Clean up local podman images (engine images, dangling images, local builds) |
+| `/crucible-tools:new-repo` | Create a new repository in the perftool-incubator GitHub organization |
+| `/crucible-tools:open-prs` | Show all open PRs in the perftool-incubator GitHub organization |
+| `/crucible-tools:repo-status` | Show the local git status for all crucible repos |
+| `/crucible-tools:workflow-status` | Show active CI workflow runs across crucible repos |
 
 ## Agents
 

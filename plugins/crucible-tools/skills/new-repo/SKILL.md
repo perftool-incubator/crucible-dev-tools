@@ -165,6 +165,6 @@ Arguments: $ARGUMENTS
    - Fetch each ruleset via `gh api repos/perftool-incubator/<repo>/rulesets/<id>`
    - Strip metadata fields (`node_id`, `created_at`, `updated_at`, `current_user_can_bypass`, `_links`)
    - Save to `.github/rulesets/branches/default-branch.json` and `.github/rulesets/branches/releases.json`
-   - Add `.github/rulesets/README.md` with content: `The files stored here are for documentation / tracking purposes only.  They must be loaded into the GitHub web GUI to be "active" -- there presence here does not result in any behavioral changes by GitHub.`
+   - Add `.github/rulesets/README.md` with content: `The files stored here are for documentation / tracking purposes only.  They must be loaded into the GitHub web GUI to be "active" -- their presence here does not result in any behavioral changes by GitHub.`
 
 8. Commit the ruleset backups on a feature branch, create a PR requesting review from the Developers team, and self-assign.

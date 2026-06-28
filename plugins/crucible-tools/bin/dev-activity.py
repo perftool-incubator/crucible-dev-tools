@@ -570,10 +570,15 @@ def main():
             pending.append(repo)
             print(" pending", file=sys.stderr)
 
+    MAX_PENDING_RETRIES = 12
     attempt = 0
     while pending:
+        if attempt >= MAX_PENDING_RETRIES:
+            print(f"Giving up on {len(pending)} repos after {attempt} attempts: "
+                  f"{', '.join(pending)}", file=sys.stderr)
+            break
         attempt += 1
-        print(f"Waiting for {len(pending)} repos (attempt {attempt})...",
+        print(f"Waiting for {len(pending)} repos (attempt {attempt}/{MAX_PENDING_RETRIES})...",
               file=sys.stderr)
         time.sleep(5)
         still_pending = []

@@ -19,6 +19,7 @@ def gh_api(endpoint):
         capture_output=True, text=True
     )
     if result.returncode != 0:
+        print(f"gh api failed: {endpoint}: {result.stderr.strip()}", file=sys.stderr)
         return None
     try:
         return json.loads(result.stdout)
@@ -117,13 +118,16 @@ def get_active_runs(org, repo):
     return runs
 
 
-def get_job_counts(org, repo, run_id):
+def get_job_counts(org, repo, run_id, attempt=1):
     counts = {"total": 0, "success": 0, "failure": 0, "in_progress": 0,
               "queued": 0, "skipped": 0, "cancelled": 0}
 
-    first_page = gh_api(
-        f"repos/{org}/{repo}/actions/runs/{run_id}/jobs?per_page=1&filter=latest"
-    )
+    if attempt > 1:
+        jobs_base = f"repos/{org}/{repo}/actions/runs/{run_id}/attempts/{attempt}/jobs"
+    else:
+        jobs_base = f"repos/{org}/{repo}/actions/runs/{run_id}/jobs?filter=latest"
+
+    first_page = gh_api(f"{jobs_base}{'&' if '?' in jobs_base else '?'}per_page=1")
     if not first_page:
         return counts
 
@@ -134,7 +138,7 @@ def get_job_counts(org, repo, run_id):
     pages = (total + 99) // 100
     for page in range(1, pages + 1):
         data = gh_api(
-            f"repos/{org}/{repo}/actions/runs/{run_id}/jobs?per_page=100&page={page}&filter=latest"
+            f"{jobs_base}{'&' if '?' in jobs_base else '?'}per_page=100&page={page}"
         )
         if not data:
             break
@@ -153,7 +157,7 @@ def get_job_counts(org, repo, run_id):
                     counts["cancelled"] += 1
             elif status == "in_progress":
                 counts["in_progress"] += 1
-            elif status == "queued":
+            elif status in ("queued", "waiting"):
                 counts["queued"] += 1
 
     return counts
@@ -171,7 +175,7 @@ def collect_data(crucible_repos, include_runners):
         print(f"Scanning [{i+1}/{len(crucible_repos)}] {name}...", file=sys.stderr)
         runs = get_active_runs(org, github_repo)
         for run in runs:
-            job_counts = get_job_counts(org, github_repo, run["id"])
+            job_counts = get_job_counts(org, github_repo, run["id"], run["attempt"])
             run["repo"] = name
             run["counts"] = job_counts
             all_runs.append(run)
