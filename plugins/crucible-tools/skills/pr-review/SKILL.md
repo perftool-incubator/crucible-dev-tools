@@ -108,9 +108,25 @@ Arguments: $ARGUMENTS
 
    ### Limitations
    <what this review could NOT verify — e.g., runtime behavior, performance, hardware-specific paths>
+
+   ### Verdict
+   **<Approve | Approve with comments | Request changes>** — <one-line rationale>
    ```
 
    Omit any severity section that has zero findings (e.g., if there are no Style findings, omit that section entirely).
+
+9. **Verdict.** End the report with a clear verdict:
+
+   ```
+   ### Verdict
+
+   **<verdict>** — <one-line rationale>
+   ```
+
+   Use one of these three verdicts:
+   - **Approve** — no findings, or only style/cosmetic items that don't need changes before merge.
+   - **Approve with comments** — findings exist but none are blocking. The PR is functional and safe to merge; the findings are suggestions or minor doc fixes the author can address at their discretion.
+   - **Request changes** — at least one Bug or a blocking Issue that should be fixed before merge. State which specific finding(s) block approval.
 
 ## Methodology Rules
 
