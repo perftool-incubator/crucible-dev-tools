@@ -35,6 +35,7 @@ Arguments: $ARGUMENTS
    - Error return values — are failures propagated correctly?
    - Resource leaks (file descriptors, memory, semaphores)
    - Race conditions in concurrent code
+   - Test coverage — if the repo has a test suite, does this change add or update tests for the new behavior? Flag untested code paths as an Issue, not a Bug.
 
    **Pass 2 — API & Contracts:**
    Check that callers and callees agree. For every function/parameter added or changed:
@@ -45,7 +46,7 @@ Arguments: $ARGUMENTS
    - Do JSON schema entries match the actual field names and types used in code?
 
    **Pass 3 — Build & Deploy:**
-   Check infrastructure wiring. For every new file or dependency:
+   Check infrastructure wiring. Skip checks that reference artifacts not present in the target repo (e.g., `rickshaw.json` and `workshop.json` only apply to benchmark and tool repos). For every new file or dependency:
    - Is it listed in `rickshaw.json` files-from-controller (for runtime-transferred files)?
    - Is it in the correct workshop JSON (for image-baked dependencies)?
    - Are system package dependencies declared (`distro` requirements in workshop JSON)?
