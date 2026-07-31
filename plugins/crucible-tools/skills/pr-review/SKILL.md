@@ -24,7 +24,9 @@ Arguments: $ARGUMENTS
 
    For each changed file, also identify its callers and callees. If file A adds a new parameter, check that file B (which calls into A) passes it. Use grep to find call sites.
 
-4. **Review by dimension.** Make five focused passes through ALL changed files. Each pass examines every file through a single lens. Do not skip files in any pass.
+   **Git history context.** For non-trivial changes, run `git log --oneline -5 <file>` and `git blame -L <changed-range> <file>` on the PR's base branch to understand why the code was written the way it was. Code that looks wrong may be an intentional workaround — history tells you. Also check recent PRs that touched the same files (`gh pr list --state merged --search "<filename>" --limit 3 --repo perftool-incubator/<repo>`) for reviewer comments that may apply to this PR too.
+
+4. **Review by dimension.** Make six focused passes. Passes 1–5 examine every changed file through a single lens — do not skip files in any pass. Pass 6 checks whether the diff itself is complete by looking for files that should have been changed but weren't.
 
    **Pass 1 — Correctness:**
    Trace code paths with concrete values, not abstract reasoning. For each non-trivial code change, pick specific inputs and walk through the logic step by step. Check:
@@ -70,7 +72,16 @@ Arguments: $ARGUMENTS
    - Shell: `[[ ]]` vs `[ ]`, deprecated operators (`-a`, `-o`)
    - Do NOT report style preferences that differ from the codebase's existing conventions. Only flag deviations from what the codebase already does.
 
-5. **File coverage audit.** After all five passes, produce a checklist of EVERY file in the diff. For each file, state either the findings or "No issues found." If a file is missing from this list, the review is incomplete — go back and examine it.
+   **Pass 6 — Completeness:**
+   Check for files that SHOULD be in the diff but aren't. Passes 1–5 review files that ARE changed — this pass catches missing co-changes in files outside the diff.
+
+   a. **CLAUDE.md co-change rules.** Read the repo's CLAUDE.md (if present). Look for co-change requirements — rules that say "when you change X, also update Y." For each rule, check whether the triggering condition is met by the actual changes in this PR (not just whether a listed file was touched). If the trigger applies and a required companion file is missing from the diff, that is a finding. Common co-change patterns include: CLI flag changes requiring help text + completions + implementation updates; config file changes requiring schema updates; behavioral changes requiring documentation updates.
+
+   b. **Documentation cross-references.** Extract the key terms introduced or changed in the diff: new config keys, flag names, version strings, enum values. Grep `docs/` for these terms in files NOT already in the diff. Read each candidate file and confirm that its content is actually inconsistent with the PR's changes before reporting — do not flag a file just because it mentions a related concept.
+
+   c. **Deduplicate.** If a missing-file finding from this pass describes the same root cause as a finding from an earlier pass (e.g., Pass 4 flagged stale help text in a changed file, and this pass flags the same help file as absent from the diff), keep only the more actionable one.
+
+5. **File coverage audit.** After all six passes, produce a checklist of EVERY file in the diff. For each file, state either the findings or "No issues found." If a file is missing from this list, the review is incomplete — go back and examine it. If Pass 6 identified missing files (files that should be in the diff but aren't), list them separately under a "Missing from diff" sub-heading.
 
 6. **Classify findings by severity:**
    - **Bug**: Incorrect behavior that WILL manifest at runtime. You must describe the specific scenario: what input or condition triggers it, and what goes wrong. If you cannot construct a triggering scenario, downgrade to Issue.
@@ -87,13 +98,14 @@ Arguments: $ARGUMENTS
 
    **Summary:** <one sentence describing what the PR does>
    **Changed files:** <count>
-   **Review dimensions:** Correctness, API & Contracts, Build & Deploy, Documentation, Style
+   **Review dimensions:** Correctness, API & Contracts, Build & Deploy, Documentation, Style, Completeness
 
    ### Bugs
    - **[file:line] <description>** — <triggering scenario>
 
    ### Issues
    - **[file:line] <description>** — <what would need to happen>
+   - **[file] <description>** — (for Pass 6 findings about files absent from the diff, omit line number)
 
    ### Documentation
    - **[file:line] <description>**
@@ -105,6 +117,10 @@ Arguments: $ARGUMENTS
    - [x] file1.c — 2 bugs, 1 issue
    - [x] file2.py — No issues
    - [x] file3.json — 1 doc issue
+   ...
+
+   Missing from diff:
+   - [ ] schema/services.json — description string needs v10dev added
    ...
 
    ### Limitations
@@ -139,3 +155,23 @@ These rules govern how findings are evaluated. They are not suggestions — they
 - **No false authority.** If you are unsure whether something is a bug, say so. "This MIGHT be wrong if X, but I cannot verify without Y" is more useful than a confident wrong answer.
 - **Codebase conventions win.** The existing code defines the style rules, not external style guides. If the file uses `[ ]` everywhere and one new line uses `[[ ]]`, that is a style finding. If the file uses `[[ ]]` everywhere, a new `[ ]` is the finding.
 - **Severity discipline.** Bugs must have triggering scenarios. Issues must have escalation conditions. Do not inflate severity to appear thorough.
+
+## False Positive Exclusions
+
+Do NOT report any of the following — they produce noise, not value:
+
+- **Pre-existing issues.** Problems that exist in the codebase before this PR. The review scope is what this PR changes, not what was already broken.
+- **Issues on unmodified lines.** If the PR didn't touch it, don't flag it — even if the surrounding code has problems.
+- **Linter/compiler territory.** Missing imports, type mismatches, formatting, unused variables — tools catch these. Don't duplicate their work.
+- **Pedantic nitpicks.** Minor style preferences a senior engineer would not bother flagging in a real review.
+- **Intentional behavior changes.** If the PR's stated purpose is to change behavior X, don't flag "behavior X changed" as a bug.
+
+## Confidence Check
+
+After assembling all findings but before writing the final report, re-examine each one:
+
+- Can you construct a specific scenario that triggers it? (Bugs and Issues)
+- Does git history or the PR description explain why the code is written this way?
+- Is this something a senior engineer familiar with the codebase would flag?
+
+Drop any finding where your confidence is low. A shorter report with high-confidence findings is more useful than a longer one padded with uncertain ones.
