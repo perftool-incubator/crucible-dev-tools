@@ -22,6 +22,7 @@ Each skill is a directory under `plugins/crucible-tools/skills/` containing a `S
 | Skill | Script | Description |
 |-------|--------|-------------|
 | activity-summary | — | Activity summary (delegates to gh CLI) |
+| architecture-review | — | Top-down architecture and design review across subsystems |
 | codebase-audit | — | Multi-pass codebase audit across all crucible repos |
 | debug-log | — | Analyze crucible logs |
 | dev-activity | `bin/dev-activity.py` | Development activity charts |
