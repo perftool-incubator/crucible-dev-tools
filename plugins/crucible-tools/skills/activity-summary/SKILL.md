@@ -98,7 +98,7 @@ Arguments: $ARGUMENTS
    - Start the file with `<meta charset="UTF-8">` to prevent encoding issues with special characters (em dashes, etc.)
    - Use HTML entities for special characters: `&mdash;` for em dashes, `&ndash;` for en dashes. Do not use raw UTF-8 punctuation in the HTML output.
    - Use plain text styling only — bold (`<b>`) for labels, `<p>` for paragraphs, `<ul>`/`<li>` for lists, `<br>` for line breaks. No headings (`<h1>`-`<h6>`), no `<code>` tags.
-   - Use `<a href="...">` for all PR/issue references so they paste as clickable links in Google Docs.
+   - Use `<a href="...">` for all references — PRs, issues, AND Jira tickets — so they paste as clickable links in Google Docs. Every mention of a Jira ticket key (e.g., PERFNFV-409) must be an `<a>` link, including in the Key themes section.
    - Sections:
      - **Headline**: "Activity Summary — perftool-incubator (date range)" for `--all`, or "Activity Summary — perftool-incubator / username (date range)" for a specific user
      - **Stats line**: PRs authored, merged, open, reviewed
