@@ -72,13 +72,18 @@ def get_repos():
 
 
 def get_contributor_stats(repo):
-    """Get weekly contributor stats for a repo."""
+    """Get weekly contributor stats for a repo, both aggregate and per-author."""
     data = gh_api(f"repos/perftool-incubator/{repo}/stats/contributors", retries=0)
     if not data or not isinstance(data, list):
-        return {}
+        return {}, {}
 
     weeks = {}
+    author_weeks = {}
     for contributor in data:
+        author_info = contributor.get("author")
+        login = author_info.get("login", "unknown") if author_info else "unknown"
+        if login not in author_weeks:
+            author_weeks[login] = {}
         for week in contributor.get("weeks", []):
             ts = week["w"]
             if ts not in weeks:
@@ -86,13 +91,19 @@ def get_contributor_stats(repo):
             weeks[ts]["commits"] += week["c"]
             weeks[ts]["additions"] += week["a"]
             weeks[ts]["deletions"] += week["d"]
+            if ts not in author_weeks[login]:
+                author_weeks[login][ts] = {"commits": 0, "additions": 0, "deletions": 0}
+            author_weeks[login][ts]["commits"] += week["c"]
+            author_weeks[login][ts]["additions"] += week["a"]
+            author_weeks[login][ts]["deletions"] += week["d"]
 
-    return weeks
+    return weeks, author_weeks
 
 
 def get_pr_data(repos, since_date):
-    """Get merged and closed PR counts per week per repo."""
+    """Get merged and closed PR counts per week per repo and per user."""
     pr_data = {}
+    user_pr_data = {}
     for repo in repos:
         pr_data[repo] = {}
 
@@ -119,6 +130,13 @@ def get_pr_data(repos, since_date):
             if week_key not in pr_data[repo]:
                 pr_data[repo][week_key] = {"merged": 0, "closed": 0}
             pr_data[repo][week_key]["merged"] = pr_data[repo][week_key].get("merged", 0) + 1
+
+            author = item.get("user", {}).get("login", "unknown")
+            if author not in user_pr_data:
+                user_pr_data[author] = {}
+            if week_key not in user_pr_data[author]:
+                user_pr_data[author][week_key] = {"merged": 0, "closed": 0}
+            user_pr_data[author][week_key]["merged"] += 1
 
         if len(data["items"]) < 100:
             break
@@ -147,11 +165,18 @@ def get_pr_data(repos, since_date):
                 pr_data[repo][week_key] = {"merged": 0, "closed": 0}
             pr_data[repo][week_key]["closed"] = pr_data[repo][week_key].get("closed", 0) + 1
 
+            author = item.get("user", {}).get("login", "unknown")
+            if author not in user_pr_data:
+                user_pr_data[author] = {}
+            if week_key not in user_pr_data[author]:
+                user_pr_data[author][week_key] = {"merged": 0, "closed": 0}
+            user_pr_data[author][week_key]["closed"] += 1
+
         if len(data["items"]) < 100:
             break
         page += 1
 
-    return pr_data
+    return pr_data, user_pr_data
 
 
 def get_workflow_data(repos, since_date):
@@ -211,7 +236,8 @@ def get_workflow_data(repos, since_date):
     return workflow_data
 
 
-def generate_html(all_data, pr_data, workflow_data, weeks_back, output_file):
+def generate_html(all_data, pr_data, workflow_data, user_commit_data,
+                  user_pr_data, weeks_back, output_file):
     """Generate HTML with all charts."""
     # --- Contributor stats charts ---
     all_timestamps = set()
@@ -329,6 +355,68 @@ def generate_html(all_data, pr_data, workflow_data, weeks_back, output_file):
         round(workflow_data[w]["total_duration_min"] / 60, 1)
         for w in wf_weeks_sorted
     ]
+
+    # --- User stats data ---
+    active_users_per_week = [
+        sum(1 for author, weeks in user_commit_data.items()
+            if weeks.get(t, {}).get("commits", 0) > 0)
+        for t in all_timestamps
+    ]
+
+    user_totals = {}
+    for author, weeks in user_commit_data.items():
+        total_commits = sum(weeks.get(t, {}).get("commits", 0) for t in all_timestamps)
+        total_additions = sum(weeks.get(t, {}).get("additions", 0) for t in all_timestamps)
+        total_deletions = sum(weeks.get(t, {}).get("deletions", 0) for t in all_timestamps)
+        if total_commits > 0 or total_additions > 0:
+            user_totals[author] = {
+                "commits": total_commits,
+                "additions": total_additions,
+                "deletions": total_deletions,
+            }
+
+    top_committers = sorted(user_totals.keys(),
+                            key=lambda u: user_totals[u]["commits"],
+                            reverse=True)[:15]
+
+    user_pr_totals = {}
+    for author, weeks in user_pr_data.items():
+        total_merged = sum(w.get("merged", 0) for w in weeks.values())
+        total_closed = sum(w.get("closed", 0) for w in weeks.values())
+        if total_merged > 0 or total_closed > 0:
+            user_pr_totals[author] = {"merged": total_merged, "closed": total_closed}
+
+    top_pr_authors = sorted(user_pr_totals.keys(),
+                            key=lambda u: user_pr_totals[u]["merged"],
+                            reverse=True)[:15]
+
+    all_user_pr_weeks = set()
+    for weeks in user_pr_data.values():
+        all_user_pr_weeks.update(weeks.keys())
+    user_pr_weeks_sorted = sorted(all_user_pr_weeks)
+
+    all_summary_users = sorted(
+        set(list(user_totals.keys()) + list(user_pr_totals.keys()))
+    )
+    user_summary = []
+    for user in all_summary_users:
+        ct = user_totals.get(user, {})
+        pt = user_pr_totals.get(user, {})
+        commits = ct.get("commits", 0)
+        additions = ct.get("additions", 0)
+        deletions = ct.get("deletions", 0)
+        prs_merged = pt.get("merged", 0)
+        prs_closed = pt.get("closed", 0)
+        if commits > 0 or additions > 0 or prs_merged > 0 or prs_closed > 0:
+            user_summary.append({
+                "user": user,
+                "commits": commits,
+                "additions": additions,
+                "deletions": deletions,
+                "prs_merged": prs_merged,
+                "prs_closed": prs_closed,
+            })
+    user_summary.sort(key=lambda x: x["commits"], reverse=True)
 
     # --- Build all charts ---
     charts_config = []
@@ -483,27 +571,137 @@ def generate_html(all_data, pr_data, workflow_data, weeks_back, output_file):
             "stacked": "false",
         })
 
+    # --- Contributor charts ---
+    if contrib_labels:
+        charts_config.append({
+            "id": "activeUsersChart",
+            "title": "Active Contributors per Week",
+            "section": "Contributor Activity",
+            "labels": contrib_labels,
+            "datasets": json.dumps([{
+                "label": "Active Contributors",
+                "data": active_users_per_week,
+                "backgroundColor": "#4363d880",
+                "borderColor": "#4363d8",
+                "borderWidth": 2, "fill": True, "pointRadius": 2,
+            }]),
+            "stacked": "false",
+        })
+
+    if contrib_labels and top_committers:
+        user_commit_datasets = []
+        for i, author in enumerate(top_committers):
+            color = colors[i % len(colors)]
+            values = [user_commit_data[author].get(t, {}).get("commits", 0)
+                      for t in all_timestamps]
+            user_commit_datasets.append({
+                "label": author,
+                "data": values,
+                "backgroundColor": color + "80",
+                "borderColor": color,
+                "borderWidth": 1, "fill": True, "pointRadius": 0,
+            })
+        charts_config.append({
+            "id": "userCommitsChart",
+            "title": f"Commits per Week (Top {len(top_committers)} Contributors)",
+            "labels": contrib_labels,
+            "datasets": json.dumps(user_commit_datasets),
+            "stacked": "true",
+        })
+
+    if user_pr_weeks_sorted and top_pr_authors:
+        user_pr_datasets = []
+        for i, author in enumerate(top_pr_authors):
+            color = colors[i % len(colors)]
+            values = [user_pr_data[author].get(w, {}).get("merged", 0)
+                      for w in user_pr_weeks_sorted]
+            user_pr_datasets.append({
+                "label": author,
+                "data": values,
+                "backgroundColor": color + "80",
+                "borderColor": color,
+                "borderWidth": 1, "fill": True, "pointRadius": 0,
+            })
+        charts_config.append({
+            "id": "userPrChart",
+            "title": f"PRs Merged per Week (Top {len(top_pr_authors)} Contributors)",
+            "labels": user_pr_weeks_sorted,
+            "datasets": json.dumps(user_pr_datasets),
+            "stacked": "true",
+        })
+
     # --- Generate HTML ---
-    html = f"""<html>
+    html = """<!DOCTYPE html>
+<html>
 <head>
+<meta charset="UTF-8">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-    body {{ font-family: Arial, sans-serif; max-width: 1200px; margin: 20px auto; background: #fafafa; }}
-    .chart-container {{ background: white; border-radius: 8px; padding: 20px; margin-bottom: 30px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
-    canvas {{ width: 100% !important; }}
+    body { font-family: Arial, sans-serif; max-width: 1200px; margin: 20px auto; background: #fafafa; }
+    .chart-container { background: white; border-radius: 8px; padding: 20px; margin-bottom: 30px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    canvas { width: 100% !important; }
+    .summary-table { width: 100%; border-collapse: collapse; }
+    .summary-table th, .summary-table td { padding: 8px 12px; text-align: right; border-bottom: 1px solid #eee; }
+    .summary-table th:first-child, .summary-table td:first-child { text-align: left; }
+    .summary-table th { background: #f5f5f5; font-weight: 600; position: sticky; top: 0; }
+    .summary-table tr:hover { background: #f9f9f9; }
+    .summary-table tfoot td { font-weight: 600; border-top: 2px solid #ccc; }
 </style>
 </head>
 <body>
-<h1>Crucible Development Activity — Last {weeks_back} Weeks</h1>
-<p>Generated {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")} — {len(active_repos)} active repos</p>
 """
+    html += f'<h1>Crucible Development Activity &mdash; Last {weeks_back} Weeks</h1>\n'
+    html += f'<p>Generated {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")}'
+    html += f' &mdash; {len(active_repos)} active repos</p>\n'
 
     for chart in charts_config:
+        if "section" in chart:
+            html += f'\n<h2 style="margin-top: 40px;">{chart["section"]}</h2>\n'
         html += f"""
 <div class="chart-container">
 <canvas id="{chart['id']}"></canvas>
 </div>
 """
+
+    if user_summary:
+        html += '\n<div class="chart-container">\n'
+        html += '<h3>Contributor Summary</h3>\n'
+        html += '<table class="summary-table">\n<thead>\n'
+        html += '<tr><th>Contributor</th><th>Commits</th><th>Additions</th>'
+        html += '<th>Deletions</th><th>Net</th>'
+        html += '<th>PRs Merged</th><th>PRs Closed</th></tr>\n'
+        html += '</thead>\n<tbody>\n'
+        total_commits = 0
+        total_additions = 0
+        total_deletions = 0
+        total_prs_merged = 0
+        total_prs_closed = 0
+        for u in user_summary:
+            net = u["additions"] - u["deletions"]
+            net_str = f'+{net:,}' if net >= 0 else f'{net:,}'
+            html += f'<tr><td>{u["user"]}</td>'
+            html += f'<td>{u["commits"]:,}</td>'
+            html += f'<td>+{u["additions"]:,}</td>'
+            html += f'<td>-{u["deletions"]:,}</td>'
+            html += f'<td>{net_str}</td>'
+            html += f'<td>{u["prs_merged"]}</td>'
+            html += f'<td>{u["prs_closed"]}</td></tr>\n'
+            total_commits += u["commits"]
+            total_additions += u["additions"]
+            total_deletions += u["deletions"]
+            total_prs_merged += u["prs_merged"]
+            total_prs_closed += u["prs_closed"]
+        total_net = total_additions - total_deletions
+        total_net_str = f'+{total_net:,}' if total_net >= 0 else f'{total_net:,}'
+        html += '</tbody>\n<tfoot>\n'
+        html += f'<tr><td>Total</td>'
+        html += f'<td>{total_commits:,}</td>'
+        html += f'<td>+{total_additions:,}</td>'
+        html += f'<td>-{total_deletions:,}</td>'
+        html += f'<td>{total_net_str}</td>'
+        html += f'<td>{total_prs_merged}</td>'
+        html += f'<td>{total_prs_closed}</td></tr>\n'
+        html += '</tfoot>\n</table>\n</div>\n'
 
     html += "<script>\n"
 
@@ -560,11 +758,13 @@ def main():
     print(f"Fetching contributor stats for {len(repos)} repos...", file=sys.stderr)
     pending = []
     all_data = {}
+    all_author_data = {}
     for i, repo in enumerate(repos):
         print(f"  [{i+1}/{len(repos)}] {repo}...", file=sys.stderr, end="")
-        stats = get_contributor_stats(repo)
+        stats, author_stats = get_contributor_stats(repo)
         if stats:
             all_data[repo] = stats
+            all_author_data[repo] = author_stats
             print(f" {len(stats)} weeks", file=sys.stderr)
         else:
             pending.append(repo)
@@ -584,9 +784,10 @@ def main():
         still_pending = []
         for repo in pending:
             print(f"  {repo}...", file=sys.stderr, end="")
-            stats = get_contributor_stats(repo)
+            stats, author_stats = get_contributor_stats(repo)
             if stats:
                 all_data[repo] = stats
+                all_author_data[repo] = author_stats
                 print(f" {len(stats)} weeks", file=sys.stderr)
             else:
                 still_pending.append(repo)
@@ -595,9 +796,22 @@ def main():
 
     print(f"Got contributor data for {len(all_data)} repos", file=sys.stderr)
 
+    # Aggregate per-user commit data across repos
+    user_commit_data = {}
+    for repo, author_stats in all_author_data.items():
+        for author, weeks in author_stats.items():
+            if author not in user_commit_data:
+                user_commit_data[author] = {}
+            for ts, counts in weeks.items():
+                if ts not in user_commit_data[author]:
+                    user_commit_data[author][ts] = {"commits": 0, "additions": 0, "deletions": 0}
+                user_commit_data[author][ts]["commits"] += counts["commits"]
+                user_commit_data[author][ts]["additions"] += counts["additions"]
+                user_commit_data[author][ts]["deletions"] += counts["deletions"]
+
     # --- PR data ---
     print(f"Fetching PR data since {since_date}...", file=sys.stderr)
-    pr_data = get_pr_data(repos, since_date)
+    pr_data, user_pr_data = get_pr_data(repos, since_date)
     total_prs = sum(
         sum(w.get("merged", 0) + w.get("closed", 0) for w in repo_weeks.values())
         for repo_weeks in pr_data.values()
@@ -611,7 +825,8 @@ def main():
     print(f"Got {total_runs} workflow runs", file=sys.stderr)
 
     # --- Generate ---
-    generate_html(all_data, pr_data, workflow_data, args.weeks, args.output)
+    generate_html(all_data, pr_data, workflow_data, user_commit_data,
+                  user_pr_data, args.weeks, args.output)
 
 
 if __name__ == "__main__":
