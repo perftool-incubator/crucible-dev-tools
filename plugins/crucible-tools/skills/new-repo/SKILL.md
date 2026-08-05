@@ -35,7 +35,11 @@ Arguments: $ARGUMENTS
 
    on:
      pull_request_target:
-       types: [opened, reopened]
+       types: [opened, reopened, synchronize, edited]
+
+   permissions:
+     issues: write
+     pull-requests: write
 
    jobs:
      block-fork-pr:
