@@ -24,3 +24,7 @@ Arguments: $ARGUMENTS
    - Workflow runs per week (by status)
    - Average workflow duration per week
    - Total workflow duration per week
+   - Active contributors per week
+   - Commits per week (by contributor)
+   - PRs merged per week (by contributor)
+   - Contributor summary table (commits, additions, deletions, net, PRs merged/closed)
