@@ -4,18 +4,68 @@ description: Comprehensive multi-pass codebase audit across all crucible repos
 
 Run a structured, repeatable codebase audit across crucible repositories. Checks for code bugs, convention compliance, structural completeness, schema validity, documentation accuracy, and cross-repo consistency.
 
-Arguments: $ARGUMENTS
-
 ## Instructions
 
-1. **Parse arguments:**
-   - `--scope <all|core|benchmarks|tools|repo-name>` (default: `all`) — limit audit scope. `all` audits every repo in repos.json. `core`, `benchmarks`, `tools` audit that category. A specific repo name (e.g., `bench-trafficgen`, `rickshaw`) audits only that repo.
-   - `--focus <all|bugs|conventions|structure|schemas|docs|consistency>` (default: `all`) — limit to specific audit passes. Maps to: `bugs` = Pass 1, `conventions` = Pass 2, `structure` = Pass 3, `schemas` = Pass 4, `docs` = Pass 5, `consistency` = Pass 6.
-   - `--severity <all|high|medium|low>` (default: `all`) — filter output to show only findings at or above this severity level.
-   - `--since <date>` — only audit files changed since this date. Uses `git log --since=<date> --name-only` in each repo to build the file list. Omit to audit all files.
-   - `--epic <JIRA-KEY>` — Jira epic to use when creating tickets (only used if user opts into issue creation after reviewing results).
+1. **Prompt for configuration** using `AskUserQuestion` with five questions:
 
-2. **Discover repos.** Read `$CRUCIBLE_HOME/config/repos.json`. Parse the `official` and `unofficial` arrays. For each repo entry, extract `name`, `type`, `repository` (git URL), and `primary-branch`. Map types to filesystem paths:
+   **Question 1: Audit scope**
+   - Header: "Scope"
+   - Question: "Which repositories should be audited?"
+   - Options:
+     - **All**: "All repositories in repos.json"
+     - **Core**: "Core subprojects only (rickshaw, toolbox, roadblock, etc.)"
+     - **Benchmarks**: "All benchmarks"
+     - **Tools**: "All tools"
+     - **Specific**: "Specific repository" (will prompt for repo name in Other field)
+   - Default: All
+
+   **Question 2: Focus areas**
+   - Header: "Focus"
+   - Question: "Which audit passes should run?"
+   - Options:
+     - **All**: "All passes (bugs, conventions, structure, schemas, docs, consistency)"
+     - **Bugs**: "Code bugs only (Pass 1)"
+     - **Conventions**: "Convention compliance only (Pass 2)"
+     - **Structure**: "Structural completeness only (Pass 3)"
+     - **Schemas**: "Schema validity only (Pass 4)"
+     - **Docs**: "Documentation accuracy only (Pass 5)"
+     - **Consistency**: "Cross-repo consistency only (Pass 6)"
+   - Default: All
+
+   **Question 3: Severity filter**
+   - Header: "Severity"
+   - Question: "Filter findings by severity level?"
+   - Options:
+     - **All**: "Show all findings"
+     - **High**: "High severity only"
+     - **Medium**: "Medium and high severity"
+     - **Low**: "Low, medium, and high severity"
+   - Default: All
+
+   **Question 4: Changed files filter**
+   - Header: "Changed files"
+   - Question: "Audit all files or only recently changed files?"
+   - Options:
+     - **All files**: "Audit all files in scope"
+     - **Since date**: "Only files changed since a specific date" (will prompt for date in Other field, format: YYYY-MM-DD or relative like 1w, 1m)
+   - Default: All files
+
+   **Question 5: Jira epic**
+   - Header: "Jira epic"
+   - Question: "Jira epic for issue tracking (optional)?"
+   - Options:
+     - **None**: "Don't create Jira tickets"
+     - **Specify**: "Use a specific epic" (will prompt for epic key like PERFNFV-334 in Other field)
+   - Default: None
+
+2. **Process the answers:**
+   - For **Audit scope**: map to repo list (all, core category, benchmark category, tool category, or specific repo name)
+   - For **Focus areas**: map to pass list (all or specific pass numbers)
+   - For **Severity filter**: use "all", "high", "medium", or "low"
+   - For **Changed files filter**: if "Since date", parse date from Other field; otherwise audit all files
+   - For **Jira epic**: if "Specify", parse epic key from Other field; otherwise no epic
+
+3. **Discover repos.** Read `$CRUCIBLE_HOME/config/repos.json`. Parse the `official` and `unofficial` arrays. For each repo entry, extract `name`, `type`, `repository` (git URL), and `primary-branch`. Map types to filesystem paths:
    - `primary` → `$CRUCIBLE_HOME`
    - `core` → `$CRUCIBLE_HOME/subprojects/core/<name>`
    - `benchmark` → `$CRUCIBLE_HOME/subprojects/benchmarks/<name>`
@@ -23,9 +73,9 @@ Arguments: $ARGUMENTS
    - `doc` → `$CRUCIBLE_HOME/subprojects/docs/<name>`
    - `userenvs` → `$CRUCIBLE_HOME/subprojects/userenvs/<name>`
 
-   Filter the repo list according to `--scope`. Verify each repo directory exists before including it.
+   Filter the repo list according to the selected scope. Verify each repo directory exists before including it.
 
-3. **Dispatch parallel agents.** Spawn agents organized by logical grouping. Each agent receives the full audit methodology (all applicable passes) and the structured output format. Use the Agent tool with `run_in_background: true`.
+4. **Dispatch parallel agents.** Spawn agents organized by logical grouping. Each agent receives the full audit methodology (all applicable passes) and the structured output format. Use the Agent tool with `run_in_background: true`.
 
    When `--scope all`, use this grouping:
 
@@ -44,7 +94,7 @@ Arguments: $ARGUMENTS
 
    If `--since` is specified, include the date in each agent's prompt so they limit their file scope accordingly.
 
-4. **Agent prompt template.** Each agent receives a prompt structured as follows (adapt the repo list and paths per agent):
+5. **Agent prompt template.** Each agent receives a prompt structured as follows (adapt the repo list and paths per agent):
 
    ```
    Audit the following crucible repos for bugs, convention violations, and structural issues.

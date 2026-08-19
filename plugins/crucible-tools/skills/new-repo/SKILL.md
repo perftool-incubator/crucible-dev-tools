@@ -4,23 +4,42 @@ description: Create a new repository in the perftool-incubator GitHub organizati
 
 Create a new repository in the perftool-incubator GitHub organization with standard files, workflows, team permissions, and branch protection rulesets.
 
-Arguments: $ARGUMENTS
-
 ## Instructions
 
-1. Gather the following from the user (or from the arguments):
-   - **Repo name** (e.g., `tool-mlxreg`, `bench-newbench`)
-   - **Description** (one-line summary)
-   - **License** (default: `apache-2.0`)
+1. **Prompt for configuration** using `AskUserQuestion` with two questions:
 
-   The primary branch is always `main`.
+   **Question 1: License**
+   - Header: "License"
+   - Question: "Which license should the repository use?"
+   - Options:
+     - **apache-2.0**: "Apache License 2.0"
+     - **mit**: "MIT License"
+     - **gpl-3.0**: "GNU General Public License v3.0"
+   - Default: apache-2.0
 
-2. Create the repo:
+   **Question 2: Repository details**
+   - Header: "Details"
+   - Question: "Provide repository name and description (format: name|description)"
+   - Options:
+     - **Tool**: "New tool repository (enter: tool-name|description)" 
+     - **Benchmark**: "New benchmark repository (enter: bench-name|description)"
+     - **Custom**: "Custom repository (enter: name|description)"
+   - Default: Tool
+   - Note: The "Other" field should contain the name and description separated by a pipe character (e.g., `tool-mlxreg|MLX register dump tool`)
+
+2. **Process the answers:**
+   - For **License**: use the selected license value
+   - For **Repository details**: parse the Other field as `name|description`
+     - Split on the pipe character to get repo name and description
+     - Validate that the name follows the expected pattern (tool-*, bench-*, or other valid name)
+   - The primary branch is always `main`
+
+3. Create the repo:
    ```
    gh repo create perftool-incubator/<repo> --public --description "<description>" --license <license>
    ```
 
-3. Clone it to a temporary directory and create the standard files:
+4. Clone it to a temporary directory and create the standard files:
 
    **README.md:**
    ```markdown

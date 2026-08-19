@@ -10,7 +10,7 @@ Provides development workflow skills and agents for the crucible performance tes
 .claude-plugin/marketplace.json     Plugin marketplace registration
 plugins/crucible-tools/
   .claude-plugin/plugin.json        Plugin metadata
-  skills/                           8 skill directories, each with SKILL.md
+  skills/                           10 skill directories, each with SKILL.md
   agents/                           Agent definitions (ci-analyzer.md)
   bin/                              Python scripts backing the skills
 ```
