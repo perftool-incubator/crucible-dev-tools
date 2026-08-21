@@ -109,7 +109,7 @@ Perform a structured, comprehensive code review of a pull request.
    - **Doc**: Documentation inaccuracy, stale reference, or gap.
    - **Style**: Convention deviation with no behavioral impact.
 
-8. **Filter prior findings.** If `--prior` was provided, remove any findings that describe the same issue. Do not re-report known problems.
+8. **Filter prior findings.** If a prior findings description was given (Question 2), remove any findings that describe the same issue. Do not re-report known problems.
 
 9. **Output the report** in this format:
 

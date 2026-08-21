@@ -6,7 +6,7 @@ Create a new repository in the perftool-incubator GitHub organization with stand
 
 ## Instructions
 
-1. **Prompt for configuration** using `AskUserQuestion` with two questions:
+1. **Prompt for configuration** using `AskUserQuestion` with four questions:
 
    **Question 1: License**
    - Header: "License"
@@ -17,21 +17,36 @@ Create a new repository in the perftool-incubator GitHub organization with stand
      - **gpl-3.0**: "GNU General Public License v3.0"
    - Default: apache-2.0
 
-   **Question 2: Repository details**
-   - Header: "Details"
-   - Question: "Provide repository name and description (format: name|description)"
+   **Question 2: Repository type**
+   - Header: "Type"
+   - Question: "What kind of repository is this?"
    - Options:
-     - **Tool**: "New tool repository (enter: tool-name|description)" 
-     - **Benchmark**: "New benchmark repository (enter: bench-name|description)"
-     - **Custom**: "Custom repository (enter: name|description)"
+     - **Tool**: "New tool repository — name should follow the tool-<name> convention"
+     - **Benchmark**: "New benchmark repository — name should follow the bench-<name> convention"
+     - **Custom**: "Other kind of repository — no naming convention required"
    - Default: Tool
-   - Note: The "Other" field should contain the name and description separated by a pipe character (e.g., `tool-mlxreg|MLX register dump tool`)
+
+   **Question 3: Repository name**
+   - Header: "Name"
+   - Question: "What should the full repository name be? Type it into the Other field (e.g. tool-mlxreg, bench-perftest)."
+   - Options:
+     - **Tool example**: "e.g. tool-mlxreg — type your actual name in Other"
+     - **Benchmark example**: "e.g. bench-perftest — type your actual name in Other"
+   - Default: none (the name is mandatory — if the user selects a labeled option instead of typing into Other, ask a direct follow-up question for the literal name before proceeding)
+
+   **Question 4: Repository description**
+   - Header: "Description"
+   - Question: "What should the repository description be?"
+   - Options:
+     - **Custom**: "Type a one-line description in the Other field"
+     - **Auto**: "Generate a default description from the repo name and type"
+   - Default: Custom
 
 2. **Process the answers:**
    - For **License**: use the selected license value
-   - For **Repository details**: parse the Other field as `name|description`
-     - Split on the pipe character to get repo name and description
-     - Validate that the name follows the expected pattern (tool-*, bench-*, or other valid name)
+   - For **Repository type**: use to validate/suggest the naming convention for Question 3
+   - For **Repository name**: use the literal text from the Other field. This value is mandatory — if it's missing, ask a follow-up question rather than guessing
+   - For **Repository description**: if "Custom", use the Other field text; if "Auto", generate "<Type> plugin for the crucible performance testing framework" using the type from Question 2
    - The primary branch is always `main`
 
 3. Create the repo:

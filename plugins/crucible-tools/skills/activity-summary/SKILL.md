@@ -78,7 +78,7 @@ Generate an activity summary for the perftool-incubator GitHub organization.
    gh api "search/issues?q=org:perftool-incubator+<author_q>+type:pr+state:open&per_page=100" --jq '.items[] | "[\(.repository_url | split("/") | .[-1])] \(.title) (#\(.number)) \(.user.login) \(.html_url)"'
    ```
 
-   **PRs reviewed** (in `--all` mode, skip the `-author:` exclusion):
+   **PRs reviewed** (when `author_mode` is `"all"`, skip the `-author:` exclusion):
    - When `author_mode` is `"user"`:
      ```
      gh api "search/issues?q=org:perftool-incubator+reviewed-by:<user>+type:pr+-author:<user>+updated:${since_date}..${until_date}&per_page=100" --jq '.items[] | "[\(.repository_url | split("/") | .[-1])] \(.title) (#\(.number)) \(.html_url)"'
@@ -160,7 +160,7 @@ Generate an activity summary for the perftool-incubator GitHub organization.
        - **Second sentence**: Why it matters or what impact it has (user/developer benefit)
        - **Optional third sentence**: Additional context for larger initiatives or cross-cutting changes
        - Include PR links and Jira ticket references where applicable. **All Jira ticket keys must be `<a>` links** to `https://issues.redhat.com/browse/<KEY>` (e.g., `<a href="https://issues.redhat.com/browse/PERFNFV-464">PERFNFV-464</a>`)
-       - In `--all` mode, include the author username for each PR
+       - When `author_mode` is `"all"`, include the author username for each PR
        - In user mode, focus language on user impact rather than technical implementation details
        - **Use nested `<ul>`/`<li>` sub-bullets** when a theme covers multiple distinct subtopics. For example, if a theme mentions infrastructure work, tool coverage, and bug fixes, break those into sub-bullets with bolded labels (e.g., `<li><b>Infrastructure:</b> description</li>`)
      - **Jira tickets** (if available): List tickets with key, summary, status, and links

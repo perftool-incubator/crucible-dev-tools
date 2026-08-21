@@ -77,7 +77,7 @@ Run a structured, repeatable codebase audit across crucible repositories. Checks
 
 4. **Dispatch parallel agents.** Spawn agents organized by logical grouping. Each agent receives the full audit methodology (all applicable passes) and the structured output format. Use the Agent tool with `run_in_background: true`.
 
-   When `--scope all`, use this grouping:
+   When the audit scope is All, use this grouping:
 
    | Agent | Repos | Rationale |
    |-------|-------|-----------|
@@ -90,9 +90,9 @@ Run a structured, repeatable codebase audit across crucible repositories. Checks
    | 7 | All tools: sysstat, procstat, ftrace, kernel, ovs, nvidia, power, forkstat, rt-trace-bpf, mlxreg, ethtool, dpdk | Similar structure |
    | 8 | Infrastructure: crucible-ci, crucible-dev-tools, crucible-examples, testing-repo, external-userenvs | CI/docs/meta repos |
 
-   When `--scope` limits to a single repo, use one agent. When limited to a category, use 1-2 agents.
+   When the audit scope limits to a single repo, use one agent. When limited to a category, use 1-2 agents.
 
-   If `--since` is specified, include the date in each agent's prompt so they limit their file scope accordingly.
+   If a changed-files-since date is specified, include the date in each agent's prompt so they limit their file scope accordingly.
 
 5. **Agent prompt template.** Each agent receives a prompt structured as follows (adapt the repo list and paths per agent):
 
@@ -103,8 +103,8 @@ Run a structured, repeatable codebase audit across crucible repositories. Checks
    - <name> at <path> (type: <type>, primary-branch: <branch>)
    - ...
 
-   [If --since specified: Only audit files changed since <date>. Run `git log --since=<date> --name-only --pretty=format:` in each repo to get the file list.]
-   [If --focus specified: Only run the specified passes.]
+   [If a changed-files-since date is specified: Only audit files changed since <date>. Run `git log --since=<date> --name-only --pretty=format:` in each repo to get the file list.]
+   [If a focus area other than All was selected: Only run the specified passes.]
 
    Run these audit passes on each repo:
 
@@ -238,7 +238,7 @@ Run a structured, repeatable codebase audit across crucible repositories. Checks
 
 5. **Collect and deduplicate results.** As agents complete, parse their output lines. Deduplicate findings that describe the same issue from different angles (e.g., a missing file flagged by both Pass 3 and Pass 6). Keep the more specific finding.
 
-6. **Apply severity filter.** If `--severity` was specified, filter findings to the requested minimum level.
+6. **Apply severity filter.** If a severity filter other than All was selected, filter findings to the requested minimum level.
 
 7. **Present the consolidated report:**
 
@@ -307,7 +307,7 @@ Run a structured, repeatable codebase audit across crucible repositories. Checks
 
    If the user says yes:
    - Group findings by repo. Create one Jira ticket per repo (or split large repos into logical groups if findings span very different areas).
-   - Create a new Jira epic for this audit run, or use `--epic` if provided. Set epic summary to "Codebase audit: <date>".
+   - Create a new Jira epic for this audit run, or use the epic provided in Question 5 if given. Set epic summary to "Codebase audit: <date>".
    - Map severity to Jira priority: HIGH → Critical, MEDIUM → Major, LOW → Minor.
    - Set story points based on fix complexity: 1-2 for convention fixes, 3-5 for code bug fixes, 5-8 for cross-repo issues.
    - For each Jira ticket, create a corresponding GitHub issue in the affected repo. Include the Jira ticket key in the GitHub issue body. Include a checklist of individual findings.

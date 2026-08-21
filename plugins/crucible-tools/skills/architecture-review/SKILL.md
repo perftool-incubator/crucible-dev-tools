@@ -55,7 +55,7 @@ Evaluate crucible's architecture across defined dimensions — abstraction integ
 
 4. **Dispatch parallel agents.** Spawn one agent per review dimension. Each agent focuses on a single dimension but reads across repos as needed. Use the Agent tool with `run_in_background: true`.
 
-   When `--scope` limits to a single dimension, use one agent. When `--repo` is specified, agents should focus their analysis on that repo's integration points.
+   When the review scope limits to a single dimension, use one agent. When a specific repo is focused, agents should focus their analysis on that repo's integration points.
 
    | Agent | Dimension | Key files to examine |
    |-------|-----------|---------------------|
@@ -90,7 +90,7 @@ Evaluate crucible's architecture across defined dimensions — abstraction integ
    - docs/ — architecture and implementation guides
 
    DEPTH: <survey|deep>
-   [If --repo specified: FOCUS: Evaluate all aspects through the lens of <repo>'s integration]
+   [If a specific repo is focused: FOCUS: Evaluate all aspects through the lens of <repo>'s integration]
 
    YOUR DIMENSION: <dimension name>
    Evaluate the following aspects. For each, assess the current state, identify concerns, and provide recommendations.
@@ -387,7 +387,7 @@ Evaluate crucible's architecture across defined dimensions — abstraction integ
    - Security posture (requires dedicated security review)
    ```
 
-   Omit any dimension section that was excluded by `--scope`.
+   Omit any dimension section that was excluded by the review scope.
 
 7. **Offer issue creation.** After presenting the report, ask: "Would you like me to create Jira tickets from the recommendations?"
 
