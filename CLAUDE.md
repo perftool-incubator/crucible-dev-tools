@@ -10,7 +10,7 @@ Provides development workflow skills and agents for the crucible performance tes
 .claude-plugin/marketplace.json     Plugin marketplace registration
 plugins/crucible-tools/
   .claude-plugin/plugin.json        Plugin metadata
-  skills/                           8 skill directories, each with SKILL.md
+  skills/                           10 skill directories, each with SKILL.md
   agents/                           Agent definitions (ci-analyzer.md)
   bin/                              Python scripts backing the skills
 ```
@@ -24,7 +24,6 @@ Each skill is a directory under `plugins/crucible-tools/skills/` containing a `S
 | activity-summary | — | Activity summary (delegates to gh CLI) |
 | architecture-review | — | Top-down architecture and design review across subsystems |
 | codebase-audit | — | Multi-pass codebase audit across all crucible repos |
-| debug-log | — | Analyze crucible logs |
 | dev-activity | `bin/dev-activity.py` | Development activity charts |
 | image-cleanup | — | Clean up podman images |
 | new-repo | — | Create new org repo with standard config |

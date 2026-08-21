@@ -4,16 +4,46 @@ description: Top-down architecture and design review across crucible subsystems
 
 Evaluate crucible's architecture across defined dimensions — abstraction integrity, coupling, plugin contracts, error handling, configuration, data flow, and sustainability. Produces subsystem-level analysis with trade-off discussion and recommendations, not line-level bug reports.
 
-Arguments: $ARGUMENTS
-
 ## Instructions
 
-1. **Parse arguments:**
-   - `--scope <all|abstraction|coupling|contracts|errors|config|dataflow|evolution>` (default: `all`) — limit to specific review dimensions. Maps to: `abstraction` = Dim 1, `coupling` = Dim 2, `contracts` = Dim 3, `errors` = Dim 4, `config` = Dim 5, `dataflow` = Dim 6, `evolution` = Dim 7.
-   - `--depth <survey|deep>` (default: `survey`) — `survey` produces a high-level assessment per dimension by examining key files and patterns. `deep` traces specific code paths end-to-end and reads implementation files thoroughly.
-   - `--repo <name>` — focus the review on how a specific repo integrates with the rest of the system. Useful for evaluating whether a new or modified benchmark/tool follows the architecture correctly. When specified, all dimensions are evaluated through the lens of that repo's integration.
+1. **Prompt for configuration** using `AskUserQuestion` with three questions:
 
-2. **Read architecture documentation.** Before spawning agents, read these docs to establish the intended architecture. Agents need this context to distinguish intentional design from accidental drift.
+   **Question 1: Review scope**
+   - Header: "Scope"
+   - Question: "Which architectural dimensions should be reviewed?"
+   - Options:
+     - **All**: "All dimensions (abstraction, coupling, contracts, errors, config, dataflow, evolution)"
+     - **Abstraction**: "Abstraction integrity only"
+     - **Coupling**: "Coupling analysis only"
+     - **Contracts**: "Plugin contracts only"
+     - **Errors**: "Error handling only"
+     - **Config**: "Configuration only"
+     - **Dataflow**: "Data flow only"
+     - **Evolution**: "Sustainability/evolution only"
+   - Default: All
+
+   **Question 2: Review depth**
+   - Header: "Depth"
+   - Question: "How thorough should the review be?"
+   - Options:
+     - **Survey**: "High-level assessment examining key files and patterns"
+     - **Deep**: "Thorough analysis tracing specific code paths end-to-end"
+   - Default: Survey
+
+   **Question 3: Repository focus**
+   - Header: "Repo focus"
+   - Question: "Focus on a specific repository's integration?"
+   - Options:
+     - **System-wide**: "Review the entire system architecture"
+     - **Specific repo**: "Focus on how a specific repo integrates" (will prompt for repo name in Other field)
+   - Default: System-wide
+
+2. **Process the answers:**
+   - For **Review scope**: map the selection to dimension(s)
+   - For **Review depth**: use "survey" or "deep" mode
+   - For **Repository focus**: if "Specific repo", parse repo name from Other field
+
+3. **Read architecture documentation.** Before spawning agents, read these docs to establish the intended architecture. Agents need this context to distinguish intentional design from accidental drift.
    - `$CRUCIBLE_HOME/docs/crucible-architecture-overview.md` — the intended layering
    - `$CRUCIBLE_HOME/docs/implementing-a-new-benchmark.md` — the plugin contract
    - `$CRUCIBLE_HOME/docs/implementing-a-new-tool.md` — the tool plugin contract
@@ -23,9 +53,9 @@ Arguments: $ARGUMENTS
 
    Summarize the key architectural invariants from these docs (e.g., "engines don't know their endpoint type", "benchmarks interact only through rickshaw.json contract"). Include these invariants in each agent's prompt so they can verify whether the code upholds them.
 
-3. **Dispatch parallel agents.** Spawn one agent per review dimension. Each agent focuses on a single dimension but reads across repos as needed. Use the Agent tool with `run_in_background: true`.
+4. **Dispatch parallel agents.** Spawn one agent per review dimension. Each agent focuses on a single dimension but reads across repos as needed. Use the Agent tool with `run_in_background: true`.
 
-   When `--scope` limits to a single dimension, use one agent. When `--repo` is specified, agents should focus their analysis on that repo's integration points.
+   When the review scope limits to a single dimension, use one agent. When a specific repo is focused, agents should focus their analysis on that repo's integration points.
 
    | Agent | Dimension | Key files to examine |
    |-------|-----------|---------------------|
@@ -37,7 +67,7 @@ Arguments: $ARGUMENTS
    | 6 | Data Flow | post-process scripts, CDM indexing, file transfer code, logger |
    | 7 | Evolution | language stats, schema versioning, test infrastructure, docs vs code |
 
-4. **Agent prompt template.** Each agent receives a prompt structured as follows (adapt per dimension):
+5. **Agent prompt template.** Each agent receives a prompt structured as follows (adapt per dimension):
 
    ```
    You are reviewing crucible's architecture for the "<dimension name>" dimension.
@@ -60,7 +90,7 @@ Arguments: $ARGUMENTS
    - docs/ — architecture and implementation guides
 
    DEPTH: <survey|deep>
-   [If --repo specified: FOCUS: Evaluate all aspects through the lens of <repo>'s integration]
+   [If a specific repo is focused: FOCUS: Evaluate all aspects through the lens of <repo>'s integration]
 
    YOUR DIMENSION: <dimension name>
    Evaluate the following aspects. For each, assess the current state, identify concerns, and provide recommendations.
@@ -357,7 +387,7 @@ Arguments: $ARGUMENTS
    - Security posture (requires dedicated security review)
    ```
 
-   Omit any dimension section that was excluded by `--scope`.
+   Omit any dimension section that was excluded by the review scope.
 
 7. **Offer issue creation.** After presenting the report, ask: "Would you like me to create Jira tickets from the recommendations?"
 

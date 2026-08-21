@@ -4,19 +4,37 @@ description: Show active CI workflow runs across crucible repos
 
 Show active CI workflow runs and self-hosted runner status for crucible repos.
 
-Arguments: $ARGUMENTS
-
 ## Instructions
 
-1. Parse the arguments:
-   - If a repo name is provided (e.g., `/crucible-tools:workflow-status rickshaw`), pass `--repo <name>` to the script
-   - Multiple repos can be comma-separated: `--repo rickshaw,fio`
-   - `--no-runners`: pass through to skip runner summary
-   - No arguments: show all crucible repos with runner summary
+1. **Prompt for configuration** using `AskUserQuestion` with two questions:
 
-2. Run `../../bin/workflow-status.py [--repo <name>] [--no-runners]` (relative to this skill directory) to collect workflow status. Always use the default raw format (do not pass `--format`). The script also supports `--format pretty` for direct terminal use but that is not used by this skill.
+   **Question 1: Repository filter**
+   - Header: "Repositories"
+   - Question: "Show workflow runs for which repository(ies)?"
+   - Options:
+     - **All**: "All crucible repositories"
+     - **Specific**: "Specific repository or repositories" (will prompt for repo names in Other field, comma-separated for multiple)
+   - Default: All
 
-3. The script outputs prefixed pipe-delimited rows to stdout. Parse by row type:
+   **Question 2: Runner summary**
+   - Header: "Runners"
+   - Question: "Include self-hosted runner summary?"
+   - Options:
+     - **Yes**: "Show runner pool status"
+     - **No**: "Skip runner summary"
+   - Default: Yes
+
+2. **Process the answers:**
+   - For **Repository filter**:
+     - If "Specific": parse repo name(s) from the Other field, pass `--repo <name>` to the script (comma-separated names go through as-is)
+     - If "All": run the script with no repo filter
+   - For **Runner summary**:
+     - If "No": pass `--no-runners` to the script
+     - If "Yes": omit the flag
+
+3. Run `../../bin/workflow-status.py [--repo <name>] [--no-runners]` (relative to this skill directory) to collect workflow status. Always use the default raw format (do not pass `--format`). The script also supports `--format pretty` for direct terminal use but that is not used by this skill.
+
+4. The script outputs prefixed pipe-delimited rows to stdout. Parse by row type:
 
    - `RUNNER|tag|total|online|busy|idle|offline` — Self-hosted runner pool summary
    - `REPO_SUMMARY|repo|workflows|total|success|failure|in_progress|queued|skipped|cancelled` — Per-repo job aggregate
@@ -24,7 +42,7 @@ Arguments: $ARGUMENTS
    - `RUN|repo|run_id|workflow|branch|attempt|status|created|url|pr_url|total|success|failure|in_progress|queued|skipped|cancelled` — Individual run detail
    - `NO_RUNS` — No active workflow runs found
 
-4. Display the output in this order:
+5. Display the output in this order:
 
    **Runner Summary** (from RUNNER rows):
    Show each runner pool as a line: `Self-hosted runners [tag]: N total, N online (N busy, N idle), N offline`

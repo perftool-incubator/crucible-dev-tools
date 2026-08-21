@@ -4,29 +4,49 @@ description: Structured multi-dimension code review for a PR in the perftool-inc
 
 Perform a structured, comprehensive code review of a pull request.
 
-Arguments: $ARGUMENTS
-
 ## Instructions
 
-1. **Parse arguments:**
-   - First positional argument: PR number (required) or full GitHub PR URL
-   - `--repo <name>`: repository name within perftool-incubator (optional — if omitted, detect from the current working directory's git remote)
-   - `--prior "<text>"`: prior review findings to exclude from this review, as a quoted string describing already-known issues. Findings that match prior items should be silently excluded from the report.
-   - If a full URL like `https://github.com/perftool-incubator/bench-trafficgen/pull/126` is given, extract both the repo and PR number from it.
+1. **Prompt for configuration** using `AskUserQuestion` with two questions:
 
-2. **Gather PR context:**
+   **Question 1: PR selection**
+   - Header: "PR"
+   - Question: "Which PR should be reviewed?"
+   - Options:
+     - **Number**: "PR number in current repo" (will prompt for number in Other field; detects repo from git remote)
+     - **URL**: "Full GitHub PR URL" (will prompt for URL in Other field, e.g., https://github.com/perftool-incubator/bench-trafficgen/pull/126)
+     - **Repo+Number**: "Repo name and PR number" (will prompt for format: repo|number in Other field, e.g., rickshaw|863)
+   - Default: Number
+
+   **Question 2: Prior findings**
+   - Header: "Prior review"
+   - Question: "Should any prior review findings be excluded?"
+   - Options:
+     - **None**: "No prior findings to exclude"
+     - **Exclude**: "Exclude specific findings" (will prompt for description of already-known issues in Other field)
+   - Default: None
+
+2. **Process the answers:**
+   - For **PR selection**:
+     - If "Number": parse PR number from Other field, detect repo from current directory's git remote via `git remote get-url origin`
+     - If "URL": extract both repo and PR number from the URL (format: `https://github.com/perftool-incubator/<repo>/pull/<number>`)
+     - If "Repo+Number": parse as `repo|number` from the Other field
+   - For **Prior findings**:
+     - If "Exclude": use the Other field text as the prior findings description
+     - If "None": no filtering
+
+3. **Gather PR context:**
    - Run `gh pr view <number> --repo perftool-incubator/<repo> --json title,body,files,commits,state` to get the PR metadata.
    - Run `gh pr diff <number> --repo perftool-incubator/<repo>` to get the full diff.
    - Read the PR description to understand the intent — what problem is being solved and what approach was taken.
    - List all changed files. This is your coverage checklist — every file must be examined.
 
-3. **Read changed files in full.** Before writing any findings, read the COMPLETE current content of every changed file using the Read tool. Do not review from the diff alone — you need surrounding context to catch issues like mismatched function signatures, missing parameter propagation, and inconsistent naming.
+4. **Read changed files in full.** Before writing any findings, read the COMPLETE current content of every changed file using the Read tool. Do not review from the diff alone — you need surrounding context to catch issues like mismatched function signatures, missing parameter propagation, and inconsistent naming.
 
    For each changed file, also identify its callers and callees. If file A adds a new parameter, check that file B (which calls into A) passes it. Use grep to find call sites.
 
    **Git history context.** For non-trivial changes, run `git log --oneline -5 <file>` and `git blame -L <changed-range> <file>` on the PR's base branch to understand why the code was written the way it was. Code that looks wrong may be an intentional workaround — history tells you. Also check recent PRs that touched the same files (`gh pr list --state merged --search "<filename>" --limit 3 --repo perftool-incubator/<repo>`) for reviewer comments that may apply to this PR too.
 
-4. **Review by dimension.** Make six focused passes. Passes 1–5 examine every changed file through a single lens — do not skip files in any pass. Pass 6 checks whether the diff itself is complete by looking for files that should have been changed but weren't.
+5. **Review by dimension.** Make six focused passes. Passes 1–5 examine every changed file through a single lens — do not skip files in any pass. Pass 6 checks whether the diff itself is complete by looking for files that should have been changed but weren't.
 
    **Pass 1 — Correctness:**
    Trace code paths with concrete values, not abstract reasoning. For each non-trivial code change, pick specific inputs and walk through the logic step by step. Check:
@@ -81,17 +101,17 @@ Arguments: $ARGUMENTS
 
    c. **Deduplicate.** If a missing-file finding from this pass describes the same root cause as a finding from an earlier pass (e.g., Pass 4 flagged stale help text in a changed file, and this pass flags the same help file as absent from the diff), keep only the more actionable one.
 
-5. **File coverage audit.** After all six passes, produce a checklist of EVERY file in the diff. For each file, state either the findings or "No issues found." If a file is missing from this list, the review is incomplete — go back and examine it. If Pass 6 identified missing files (files that should be in the diff but aren't), list them separately under a "Missing from diff" sub-heading.
+6. **File coverage audit.** After all six passes, produce a checklist of EVERY file in the diff. For each file, state either the findings or "No issues found." If a file is missing from this list, the review is incomplete — go back and examine it. If Pass 6 identified missing files (files that should be in the diff but aren't), list them separately under a "Missing from diff" sub-heading.
 
-6. **Classify findings by severity:**
+7. **Classify findings by severity:**
    - **Bug**: Incorrect behavior that WILL manifest at runtime. You must describe the specific scenario: what input or condition triggers it, and what goes wrong. If you cannot construct a triggering scenario, downgrade to Issue.
    - **Issue**: Suboptimal but functional — missing validation, fragile assumption, potential future problem. State what would need to happen for this to become a real problem.
    - **Doc**: Documentation inaccuracy, stale reference, or gap.
    - **Style**: Convention deviation with no behavioral impact.
 
-7. **Filter prior findings.** If `--prior` was provided, remove any findings that describe the same issue. Do not re-report known problems.
+8. **Filter prior findings.** If a prior findings description was given (Question 2), remove any findings that describe the same issue. Do not re-report known problems.
 
-8. **Output the report** in this format:
+9. **Output the report** in this format:
 
    ```
    ## PR Review: <repo>#<number> — <title>
@@ -132,7 +152,7 @@ Arguments: $ARGUMENTS
 
    Omit any severity section that has zero findings (e.g., if there are no Style findings, omit that section entirely).
 
-9. **Verdict.** End the report with a clear verdict:
+10. **Verdict.** End the report with a clear verdict:
 
    ```
    ### Verdict
