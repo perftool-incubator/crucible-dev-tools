@@ -27,8 +27,8 @@ Generate a comprehensive, synthesized inventory of pending and actionable work a
      - **High Priority**: "High-priority items, blockers, and in-progress tasks only"
    - Default: All
 
-   **Question 3: Backlog depth**
-   - Header: "Backlog depth"
+   **Question 3: Depth**
+   - Header: "Depth"
    - Question: "How deep should the backlog review be?"
    - Options:
      - **Comprehensive**: "Full categorized inventory (PRs, direct tasks, audit fixes, backlog, campaigns)"
@@ -41,38 +41,46 @@ Generate a comprehensive, synthesized inventory of pending and actionable work a
      - If "Specific": parse username from the Other field, set `user_scope` to `"user"` and `target_user` to that username
      - If "All": set `user_scope` to `"all"` and `target_user` to empty
    - For **Focus area**: set `focus_mode` to `"all"`, `"prs"`, `"assignments"`, or `"high-priority"`
-   - For **Backlog depth**: set `backlog_depth` to `"comprehensive"` or `"active"`
+   - For **Depth**: set `backlog_depth` to `"comprehensive"` or `"active"`
 
 3. **Collect GitHub Data using `gh api`:**
 
-   In the queries below, `<author_q>` is:
-   - `author:<target_user>` when `user_scope` is `"user"`
-   - omitted entirely when `user_scope` is `"all"`
+   In the queries below:
+   - `<author_q>` is `author:<target_user>` when `user_scope` is `"user"`, or omitted entirely when `user_scope` is `"all"`
+   - `<issue_scope_q>` is `assignee:<target_user>` (or `author:<target_user>`) when `user_scope` is `"user"`, or omitted entirely when `user_scope` is `"all"`
 
    **A. Open PRs across the organization:**
    ```bash
-   gh api "search/issues?q=org:perftool-incubator+type:pr+state:open&per_page=100"
+   gh api "search/issues?q=org:perftool-incubator+<author_q>+type:pr+state:open&per_page=100"
    ```
    For each open PR, extract: repository, PR number, title, author (`user.login`), HTML URL, draft status, and updated timestamp.
 
-   Inspect each PR for mergeability, merge conflict status, CI status, and reviews:
+   Inspect each PR for mergeability, merge conflict status, reviews, and CI check status:
    ```bash
    gh api "repos/perftool-incubator/${repo}/pulls/${number}" --jq '{mergeable: .mergeable, mergeable_state: .mergeable_state, draft: .draft, head_sha: .head.sha}'
    gh api "repos/perftool-incubator/${repo}/pulls/${number}/reviews" --jq '[.[] | {user: .user.login, state: .state}]'
+   gh api "repos/perftool-incubator/${repo}/commits/${head_sha}/check-runs" --jq '[.check_runs[] | {name: .name, status: .status, conclusion: .conclusion}]'
    ```
 
    **B. Open Issues across the organization:**
    ```bash
-   gh api "search/issues?q=org:perftool-incubator+type:issue+state:open&per_page=100"
+   # Scoped issues when user_scope is "user"
+   gh api "search/issues?q=org:perftool-incubator+<issue_scope_q>+type:issue+state:open&per_page=100"
+
+   # Total open org-wide issue count for statistics
+   gh api "search/issues?q=org:perftool-incubator+type:issue+state:open&per_page=100" --jq '.total_count'
    ```
-   Query total open issue count across all repositories in `perftool-incubator`.
 
 4. **Collect Jira Tickets (optional):**
-   If a Jira MCP server is available (check for tools starting with `jira` or `mcp__jira__`), query the `PERFNFV` project:
+   If a Jira MCP server is available (check for tools starting with `jira` or `mcp__jira__`), query the `PERFNFV` project with dynamically built JQL:
 
-   **A. Unresolved Tickets Assigned to User:**
+   - Dynamic assignee clause:
+     - When `user_scope` is `"user"`: `<assignee_clause>` = `assignee in ("${target_user}", "${target_user}@redhat.com") AND`
+     - When `user_scope` is `"all"`: `<assignee_clause>` is omitted entirely
+
+   **A. Unresolved Tickets Assigned to Scope:**
    ```
-   jql: "project = PERFNFV AND assignee in (\"${target_user}\", \"${target_user}@redhat.com\", \"Karl Rister\", \"krister\") AND resolution is EMPTY ORDER BY key ASC"
+   jql: "project = PERFNFV AND <assignee_clause> resolution is EMPTY ORDER BY priority DESC, key ASC"
    ```
 
    **B. In-Progress and Active Tickets in Project:**
@@ -90,21 +98,30 @@ Generate a comprehensive, synthesized inventory of pending and actionable work a
    jql: "project = PERFNFV AND (summary ~ \"Campaign\" OR summary ~ \"Latency\" OR summary ~ \"PREEMPT_RT\" OR summary ~ \"tail latency\" OR summary ~ \"vDU\") AND resolution is EMPTY ORDER BY updated DESC"
    ```
 
+   If no Jira MCP server is available, continue with GitHub data only.
+
 5. **Cross-Correlate and Synthesize Findings:**
 
    Cross-reference every GitHub issue/PR with Jira tickets:
    - Match by key in title/body (e.g., `PERFNFV-400` in PR title or commit message).
    - Match by referenced GitHub issue URL or `#number` in Jira summary/description (e.g., `Issue #55 ... for bench-iperf` -> `bench-iperf#55`).
-   - Group findings into clear thematic categories:
+
+   **Apply Focus Mode & Depth Filters:**
+   - If `focus_mode == "prs"`: Only emit Section 1 (Immediate Pull Request Actions).
+   - If `focus_mode == "assignments"`: Only emit Section 1 (authored PRs) and Section 2 (Direct Assignments).
+   - If `focus_mode == "high-priority"`: Emit Section 1, Section 2A (Active), blockers/critical Jira tickets, and active campaigns.
+   - If `backlog_depth == "active"`: Omit low-priority backlog and untriaged sub-tasks (Section 2C and Section 4 subproject golden-file batch); only include in-progress tasks and immediate PR actions.
+
+   **Standard Sections (when focus_mode == "all" and backlog_depth == "comprehensive"):**
 
    **1. Immediate Pull Request Actions:**
-   - Table or structured breakdown of each open PR with:
+   - Table or structured breakdown of open PRs with:
      - Repository & PR number / link
      - Author
      - Detailed status: Approved & Mergeable (CI green), Changes Requested, Conflicting / Needs Rebase, Awaiting Review
      - Action Needed: Specific technical step required (e.g., "Ready to merge", "Rebase on main to resolve conflict", "Address review comments")
 
-   **2. High-Priority Direct Assignments (for User):**
+   **2. High-Priority Direct Assignments (for Target User / Scope):**
    - Subdivide into actionable areas:
      - **A. Active Infrastructure & Ongoing Work** (e.g. OpenSearch, shared storage, CDM metric ports)
      - **B. CI Unit Test Workflow Expansion Initiative** (e.g. unit test workflows across subprojects)
@@ -137,6 +154,7 @@ Generate a comprehensive, synthesized inventory of pending and actionable work a
    Generate an HTML file formatted for clean copy-pasting into Google Docs:
    - Start the file with `<meta charset="UTF-8">` to ensure correct character encoding.
    - Use HTML entities for special characters: `&mdash;` for em dashes, `&ndash;` for en dashes, `&bull;` for bullet points. Do not use raw UTF-8 punctuation in the HTML output.
+   - **HTML-Escape Dynamic Content:** Explicitly escape all dynamic strings extracted from GitHub and Jira (PR/issue titles, Jira summaries, descriptions) by replacing `&` with `&amp;`, `<` with `&lt;`, `>` with `&gt;`, and `"` with `&quot;` to prevent malformed HTML.
    - Use plain text styling only — bold (`<b>`) for labels, `<p>` for paragraphs, `<ul>`/`<li>` for lists, `<br>` for line breaks. No headings (`<h1>`-`<h6>`), no `<code>` tags.
    - Use `<a href="...">` for all references — PRs, issues, AND Jira tickets (e.g. `<a href="https://issues.redhat.com/browse/PERFNFV-473">PERFNFV-473</a>`), so they paste as clickable links in Google Docs. Every mention of a Jira ticket key or GitHub issue/PR must be an `<a>` link.
    - Dual-link entries wherever a Jira ticket and GitHub issue correspond to each other (e.g., `<a href="https://issues.redhat.com/browse/PERFNFV-400">PERFNFV-400</a> / <a href="https://github.com/perftool-incubator/bench-iperf/issues/55">bench-iperf#55</a>: Description`).
