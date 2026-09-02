@@ -23,6 +23,7 @@ Claude Code will prompt you to install the crucible-tools plugin — accept it.
 | `/crucible-tools:image-cleanup` | Clean up local podman images (engine images, dangling images, local builds) |
 | `/crucible-tools:new-repo` | Create a new repository in the perftool-incubator GitHub organization |
 | `/crucible-tools:open-prs` | Show all open PRs in the perftool-incubator GitHub organization |
+| `/crucible-tools:pending-work` | Generate a comprehensive pending work report from Jira tickets and GitHub issues/PRs |
 | `/crucible-tools:repo-status` | Show the local git status for all crucible repos |
 | `/crucible-tools:workflow-status` | Show active CI workflow runs across crucible repos |
 
