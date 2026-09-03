@@ -12,7 +12,7 @@ Generate a comprehensive, synthesized inventory of pending and actionable work a
    - Header: "Assignee"
    - Question: "Show pending work for which user(s)?"
    - Options:
-     - **Me**: "My direct assignments and open PRs/issues" (get authenticated user via `gh api user --jq '.login'`, name via Jira/Git config)
+     - **Me**: "My direct assignments and open PRs/issues"
      - **All**: "All organization members (all assignees and unassigned work)"
      - **Specific**: "Specific user" (will prompt for username in Other field)
    - Default: Me
@@ -35,19 +35,32 @@ Generate a comprehensive, synthesized inventory of pending and actionable work a
      - **Active & Immediate**: "Immediate PR actions and in-progress work only"
    - Default: Comprehensive
 
-2. **Process the answers:**
+2. **Process and Resolve User Identities:**
    - For **Assignee / Scope**:
-     - If "Me": get authenticated user with `gh api user --jq '.login'`, set `user_scope` to `"user"` and `target_user` to that username
-     - If "Specific": parse username from the Other field, set `user_scope` to `"user"` and `target_user` to that username
-     - If "All": set `user_scope` to `"all"` and `target_user` to empty
-   - For **Focus area**: set `focus_mode` to `"all"`, `"prs"`, `"assignments"`, or `"high-priority"`
-   - For **Depth**: set `backlog_depth` to `"comprehensive"` or `"active"`
+     - If "Me":
+       - **GitHub Identity (`target_gh_user`):** Query authenticated user via `gh api user --jq '.login'`.
+       - **Jira Identity (`target_jira_users`):** Resolve Jira account identifiers from git and system configuration to handle varying usernames, emails, and display names:
+         1. `target_gh_user` (GitHub login)
+         2. `git config user.name` (Full display name, e.g. "Karl Rister")
+         3. `git config user.email` (Email address, e.g. "krister@redhat.com", and the username prefix before `@`)
+         4. `CRUCIBLE_NAME` and `CRUCIBLE_EMAIL` from `~/.crucible/identity` (if the file exists)
+         Collect and deduplicate these non-empty values into the `target_jira_users` list.
+       - Set `user_scope` to `"user"`.
+     - If "Specific":
+       - Parse the specified user identifier from the Other field into `spec_user`.
+       - Set `target_gh_user` to `spec_user`.
+       - Set `target_jira_users` to `[spec_user, spec_user + "@redhat.com"]`.
+       - Set `user_scope` to `"user"`.
+     - If "All":
+       - Set `user_scope` to `"all"`, `target_gh_user` to `""`, and `target_jira_users` to `[]`.
+   - For **Focus area**: set `focus_mode` to `"all"`, `"prs"`, `"assignments"`, or `"high-priority"`.
+   - For **Depth**: set `backlog_depth` to `"comprehensive"` or `"active"`.
 
 3. **Collect GitHub Data using `gh api`:**
 
    In the queries below:
-   - `<author_q>` is `author:<target_user>` when `user_scope` is `"user"`, or omitted entirely when `user_scope` is `"all"`
-   - `<issue_scope_q>` is `assignee:<target_user>` (or `author:<target_user>`) when `user_scope` is `"user"`, or omitted entirely when `user_scope` is `"all"`
+   - `<author_q>` is `author:<target_gh_user>` when `user_scope` is `"user"`, or omitted entirely when `user_scope` is `"all"`.
+   - `<issue_scope_q>` is `assignee:<target_gh_user>` (or `author:<target_gh_user>`) when `user_scope` is `"user"`, or omitted entirely when `user_scope` is `"all"`.
 
    **A. Open PRs across the organization:**
    ```bash
@@ -74,28 +87,44 @@ Generate a comprehensive, synthesized inventory of pending and actionable work a
 4. **Collect Jira Tickets (optional):**
    If a Jira MCP server is available (check for tools starting with `jira` or `mcp__jira__`), query the `PERFNFV` project with dynamically built JQL:
 
-   - Dynamic assignee clause:
-     - When `user_scope` is `"user"`: `<assignee_clause>` = `assignee in ("${target_user}", "${target_user}@redhat.com") AND`
-     - When `user_scope` is `"all"`: `<assignee_clause>` is omitted entirely
+   - Dynamic assignee clause (`<assignee_clause>`):
+     - When `user_scope` is `"user"`: format as `assignee in ("${target_jira_users[0]}", "${target_jira_users[1]}", ...) AND`
+     - When `user_scope` is `"all"`: omitted entirely.
+
+   - Dynamic status filter (`<status_clause>`):
+     - When `backlog_depth` is `"comprehensive"`: `resolution is EMPTY`
+     - When `backlog_depth` is `"active"`: `status in ("In Progress", "Selected for Development")`
+
+   - Dynamic priority filter (`<priority_clause>`):
+     - When `focus_mode` is `"high-priority"`: `AND (priority in (Blocker, Critical, High) OR status = "In Progress")`
+     - Otherwise: omitted.
 
    **A. Unresolved Tickets Assigned to Scope:**
    ```
-   jql: "project = PERFNFV AND <assignee_clause> resolution is EMPTY ORDER BY priority DESC, key ASC"
+   jql: "project = PERFNFV AND <assignee_clause> <status_clause> <priority_clause> ORDER BY priority DESC, key ASC"
    ```
 
    **B. In-Progress and Active Tickets in Project:**
    ```
-   jql: "project = PERFNFV AND status in (\"In Progress\", \"Selected for Development\", \"To Do\") ORDER BY updated DESC"
+   jql: "project = PERFNFV AND status in (\"In Progress\", \"Selected for Development\", \"To Do\") <priority_clause> ORDER BY updated DESC"
    ```
 
    **C. Codebase Audit Epics and Sub-Tasks:**
    ```
+   # When backlog_depth is comprehensive
    jql: "project = PERFNFV AND (key = PERFNFV-426 OR \"Epic Link\" = PERFNFV-426 OR parent = PERFNFV-426 OR summary ~ \"Codebase audit\" OR summary ~ \"Audit:\") AND resolution is EMPTY ORDER BY key ASC"
+
+   # When backlog_depth is active
+   jql: "project = PERFNFV AND (key = PERFNFV-426 OR \"Epic Link\" = PERFNFV-426 OR parent = PERFNFV-426 OR summary ~ \"Codebase audit\" OR summary ~ \"Audit:\") AND status in (\"In Progress\", \"Selected for Development\") ORDER BY updated DESC"
    ```
 
    **D. Performance Studies & Campaign Tickets:**
    ```
+   # When backlog_depth is comprehensive
    jql: "project = PERFNFV AND (summary ~ \"Campaign\" OR summary ~ \"Latency\" OR summary ~ \"PREEMPT_RT\" OR summary ~ \"tail latency\" OR summary ~ \"vDU\") AND resolution is EMPTY ORDER BY updated DESC"
+
+   # When backlog_depth is active
+   jql: "project = PERFNFV AND (summary ~ \"Campaign\" OR summary ~ \"Latency\" OR summary ~ \"PREEMPT_RT\" OR summary ~ \"tail latency\" OR summary ~ \"vDU\") AND status in (\"In Progress\", \"Selected for Development\") ORDER BY updated DESC"
    ```
 
    If no Jira MCP server is available, continue with GitHub data only.
@@ -107,12 +136,12 @@ Generate a comprehensive, synthesized inventory of pending and actionable work a
    - Match by referenced GitHub issue URL or `#number` in Jira summary/description (e.g., `Issue #55 ... for bench-iperf` -> `bench-iperf#55`).
 
    **Apply Focus Mode & Depth Filters:**
-   - If `focus_mode == "prs"`: Only emit Section 1 (Immediate Pull Request Actions).
-   - If `focus_mode == "assignments"`: Only emit Section 1 (authored PRs) and Section 2 (Direct Assignments).
-   - If `focus_mode == "high-priority"`: Emit Section 1, Section 2A (Active), blockers/critical Jira tickets, and active campaigns.
-   - If `backlog_depth == "active"`: Omit low-priority backlog and untriaged sub-tasks (Section 2C and Section 4 subproject golden-file batch); only include in-progress tasks and immediate PR actions.
+   - **`focus_mode == "prs"`**: Only emit Section 1 (Immediate Pull Request Actions).
+   - **`focus_mode == "assignments"`**: Only emit Section 1 (authored PRs) and Section 2 (Direct Assignments).
+   - **`focus_mode == "high-priority"`**: Emit Section 1 (PRs that are merge-ready, blocked on CI, or conflicting), Section 2 (only tickets with priority `Blocker`, `Critical`, `High` or active `In Progress`), and only active high-priority audit/campaign items.
+   - **`backlog_depth == "active"`**: Omit all Backlog / To-Do tasks; in Section 2 only emit active in-progress infrastructure/tasks (Section 2A), and in Section 3 and Section 5 only emit tickets currently in active progress (`status in ("In Progress", "Selected for Development")`). Omit Section 2C (backlog tasks) and Section 4 (general backlog batch).
 
-   **Standard Sections (when focus_mode == "all" and backlog_depth == "comprehensive"):**
+   **Standard Sections (when `focus_mode == "all"` and `backlog_depth == "comprehensive"`):**
 
    **1. Immediate Pull Request Actions:**
    - Table or structured breakdown of open PRs with:
