@@ -28,6 +28,7 @@ Each skill is a directory under `plugins/crucible-tools/skills/` containing a `S
 | image-cleanup | — | Clean up podman images |
 | new-repo | — | Create new org repo with standard config |
 | open-prs | `bin/open-prs.py` | Open PRs in the org |
+| pending-work | — | Comprehensive pending work report from Jira and GitHub |
 | pr-review | — | Structured multi-dimension PR code review |
 | repo-status | `bin/repo-status.py` | Git status across crucible repos |
 | workflow-status | `bin/workflow-status.py` | Active CI workflow runs |
