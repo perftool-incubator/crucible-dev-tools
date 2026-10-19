@@ -13,16 +13,17 @@ Analyze crucible logs to debug a failed run or command.
    - Question: "Which session(s) should be analyzed?"
    - Options:
      - **Last**: "Most recent session"
-     - **Last N**: "Last N sessions" (will prompt for number in Other field)
-     - **Specific**: "Specific session ID" (will prompt for session ID in Other field)
-     - **Since**: "Sessions from a time range" (will prompt for time like 1h, 2d, YYYY-MM-DD in Other field)
+     - **Last N**: "A chosen number of recent sessions"
+     - **Specific**: "A session with a specific ID"
+     - **Since**: "Sessions from a chosen time range"
    - Default: Last
 
 2. **Process the answer:**
    - If "Last": analyze the most recent session
-   - If "Last N": parse number from the Other field, analyze last N sessions
-   - If "Specific": parse session ID from the Other field, analyze that session
-   - If "Since": parse time range from the Other field, analyze sessions from that time
+   - If "Last N": ask a separate follow-up question for the count, require a positive integer, and analyze that many recent sessions
+   - If "Specific": ask a separate follow-up question for the exact session ID, then analyze that session
+   - If "Since": ask a separate follow-up question for a time range (for example, `1h`, `2d`, or `YYYY-MM-DD`), then analyze sessions from that time
+   - Treat the initial answer as the selection mode only; it does not contain the count, ID, or time range. Do not continue until the required follow-up value is supplied.
    - Resolve the selection to one or more exact `session_id` values before gathering diagnostics. For "Since", compare the session timestamps to the requested range.
 
 3. Resolve and show only the selected session entries. `crucible log sessions` has no built-in limit, so do not send its unfiltered output to the diagnostic context:
