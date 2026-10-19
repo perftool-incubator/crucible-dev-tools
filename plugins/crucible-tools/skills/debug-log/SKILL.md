@@ -45,7 +45,7 @@ Analyze crucible logs to debug a failed run or command.
 
    **Search for common failure patterns:**
    ```
-   crucible log view sessionid <session-id> --grep "ERROR\|FAIL\|error\|abort\|timeout"
+   crucible log view sessionid <session-id> --grep "ERROR|FAIL|error|abort|timeout"
    ```
    Run each query for every selected session ID.
 
