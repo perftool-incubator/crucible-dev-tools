@@ -23,13 +23,13 @@ Analyze crucible logs to debug a failed run or command.
    - If "Last N": parse number from the Other field, analyze last N sessions
    - If "Specific": parse session ID from the Other field, analyze that session
    - If "Since": parse time range from the Other field, analyze sessions from that time
-   - Resolve the selection to one or more exact `session_id` values from the session listing before gathering diagnostics. For "Since", compare the session timestamps to the requested range.
+   - Resolve the selection to one or more exact `session_id` values before gathering diagnostics. For "Since", compare the session timestamps to the requested range.
 
-3. Start by listing recent sessions to establish context:
+3. Resolve and show only the selected session entries. `crucible log sessions` has no built-in limit, so do not send its unfiltered output to the diagnostic context:
    ```
-   crucible log sessions --sort timestamp --order desc --format json
+   crucible log sessions --sort timestamp --order desc --format json | sed -n '1p'
    ```
-   Use each entry's `session_id`, `timestamp`, and `command` fields to resolve the selected session IDs. Show the user the recent sessions so they can identify which one to investigate.
+   For "Last N", use the same command with `sed -n '1,10p'`, replacing `10` with the requested count. For "Specific", use the supplied ID directly and inspect its targeted log output instead of listing all sessions. For "Since", filter the JSON-lines output locally by its `timestamp` field before displaying it; show only matching entries. Use each selected entry's `session_id`, `timestamp`, and `command` fields to guide diagnosis.
 
 4. For the target session(s), gather diagnostic information:
 
@@ -45,7 +45,7 @@ Analyze crucible logs to debug a failed run or command.
 
    **Search for common failure patterns:**
    ```
-   crucible log view sessionid <session-id> --grep "ERROR|FAIL|error|abort|timeout"
+   crucible log view sessionid <session-id> --grep "(?i)(error|fail|abort|timeout)"
    ```
    Run each query for every selected session ID.
 
