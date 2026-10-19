@@ -1,197 +1,135 @@
 ---
-description: Structured multi-dimension code review for a PR in the perftool-incubator org
+name: pr-review
+description: High-confidence pull-request review for perftool-incubator repositories, with optional Crucible integration and documentation auditing
 ---
 
-Perform a structured, comprehensive code review of a pull request.
+Review a pull request for defects introduced by the proposed change. Prioritize concrete, actionable correctness and security findings over exhaustive commentary. Do not modify files, create commits, or post GitHub comments unless the user explicitly asks.
 
-## Instructions
+## Review target
 
-1. **Prompt for configuration** using `AskUserQuestion` with two questions:
+Accept any of these targets:
 
-   **Question 1: PR selection**
-   - Header: "PR"
-   - Question: "Which PR should be reviewed?"
-   - Options:
-     - **Number**: "PR number in current repo" (will prompt for number in Other field; detects repo from git remote)
-     - **URL**: "Full GitHub PR URL" (will prompt for URL in Other field, e.g., https://github.com/perftool-incubator/bench-trafficgen/pull/126)
-     - **Repo+Number**: "Repo name and PR number" (will prompt for format: repo|number in Other field, e.g., rickshaw|863)
-   - Default: Number
+- A GitHub PR URL, repository/name plus PR number, or the current branch's PR.
+- A local commit or a base branch.
+- Current local changes, including staged, unstaged, and untracked files.
 
-   **Question 2: Prior findings**
-   - Header: "Prior review"
-   - Question: "Should any prior review findings be excluded?"
-   - Options:
-     - **None**: "No prior findings to exclude"
-     - **Exclude**: "Exclude specific findings" (will prompt for description of already-known issues in Other field)
-   - Default: None
+If the target is unambiguous, do not stop for a configuration questionnaire. If it is ambiguous, ask one concise question. If prior findings are supplied, use them only to avoid restating the same root cause; never suppress a new symptom, regression, or independent security exposure.
 
-2. **Process the answers:**
-   - For **PR selection**:
-     - If "Number": parse PR number from Other field, detect repo from current directory's git remote via `git remote get-url origin`
-     - If "URL": extract both repo and PR number from the URL (format: `https://github.com/perftool-incubator/<repo>/pull/<number>`)
-     - If "Repo+Number": parse as `repo|number` from the Other field
-   - For **Prior findings**:
-     - If "Exclude": use the Other field text as the prior findings description
-     - If "None": no filtering
+For a GitHub PR, resolve and record the repository, PR number, base SHA, head SHA, title, description, changed-file statuses, CI/check results, existing reviews, and review comments. Use the actual PR head revision for source inspection. Do not combine a PR diff with whatever happens to be checked out in the current workspace. If the head is not locally available, use an isolated temporary worktree or an equivalent read-only source view.
 
-3. **Gather PR context:**
-   - Run `gh pr view <number> --repo perftool-incubator/<repo> --json title,body,files,commits,state` to get the PR metadata.
-   - Run `gh pr diff <number> --repo perftool-incubator/<repo>` to get the full diff.
-   - Read the PR description to understand the intent — what problem is being solved and what approach was taken.
-   - List all changed files. This is your coverage checklist — every file must be examined.
+For a local target, record the exact diff range before inspecting files. Include rename, deletion, binary, generated, and untracked-file status in the coverage map.
 
-4. **Read changed files in full.** Before writing any findings, read the COMPLETE current content of every changed file using the Read tool. Do not review from the diff alone — you need surrounding context to catch issues like mismatched function signatures, missing parameter propagation, and inconsistent naming.
+## Repository context
 
-   For each changed file, also identify its callers and callees. If file A adds a new parameter, check that file B (which calls into A) passes it. Use grep to find call sites.
+Before judging code, load the applicable project instructions. Starting at the repository root and walking toward each changed file, apply the normal precedence: the most-specific `AGENTS.override.md`, `AGENTS.md`, `CLAUDE.md`, or configured fallback file wins; user instructions take precedence over repository instructions. For changes in an independently versioned Crucible subproject, read that subproject's instructions and history as well as the parent repository's.
 
-   **Git history context.** For non-trivial changes, run `git log --oneline -5 <file>` and `git blame -L <changed-range> <file>` on the PR's base branch to understand why the code was written the way it was. Code that looks wrong may be an intentional workaround — history tells you. Also check recent PRs that touched the same files (`gh pr list --state merged --search "<filename>" --limit 3 --repo perftool-incubator/<repo>`) for reviewer comments that may apply to this PR too.
+Read the PR description and linked issue context when available. Inspect relevant CI workflows, build files, schemas, and implementation guides only when they bear on the changed behavior. History is useful when intent is ambiguous, but do not run blanket `log` or `blame` passes over every file.
 
-5. **Review by dimension.** Make six focused passes. Passes 1–5 examine every changed file through a single lens — do not skip files in any pass. Pass 6 checks whether the diff itself is complete by looking for files that should have been changed but weren't.
+## Evidence and coverage
 
-   **Pass 1 — Correctness:**
-   Trace code paths with concrete values, not abstract reasoning. For each non-trivial code change, pick specific inputs and walk through the logic step by step. Check:
-   - Boundary conditions and off-by-one errors
-   - Sign errors in arithmetic (especially clock/time math)
-   - Integer overflow, truncation, or type mismatch
-   - Null/undefined/empty handling
-   - Error return values — are failures propagated correctly?
-   - Resource leaks (file descriptors, memory, semaphores)
-   - Race conditions in concurrent code
-   - Test coverage — if the repo has a test suite, does this change add or update tests for the new behavior? Flag untested code paths as an Issue, not a Bug.
+1. Build a changed-file and changed-line map from the target's exact base-to-head diff.
+2. Read each changed hunk with enough surrounding context to understand the enclosing function, state machine, data structure, or configuration flow. Read an entire file when it is small or when cross-file context requires it; do not consume context reading large unrelated files wholesale.
+3. For changed functions, parameters, schemas, commands, and configuration keys, find callers, callees, consumers, and validation sites with repository-aware search. Follow symlinks or subproject boundaries when the architecture requires it.
+4. For every candidate finding, prove that the changed code introduces it. Check the base version, history, or an equivalent before/after execution path when necessary.
+5. Every primary finding must point to the shortest possible changed-line range that explains the defect. Do not report a problem only on an unchanged line or attach a finding to a file absent from the diff. If a missing companion file is the cause, attach the finding to the changed line that creates the broken contract and name the missing file in the explanation.
 
-   **Pass 2 — API & Contracts:**
-   Check that callers and callees agree. For every function/parameter added or changed:
-   - Is the parameter declared in all layers? (CLI argparse → config propagation → usage site)
-   - Do format strings match their arguments? Count every `%d`/`%s` and verify the argument list.
-   - Are getopt option strings consistent with the long_opts table? (`required_argument` = `:`, `optional_argument` = `::`, `no_argument` = nothing)
-   - Are return values checked at every call site?
-   - Do JSON schema entries match the actual field names and types used in code?
+## Finding gate
 
-   **Pass 3 — Build & Deploy:**
-   Check infrastructure wiring. Skip checks that reference artifacts not present in the target repo (e.g., `rickshaw.json` and `workshop.json` only apply to benchmark and tool repos). For every new file or dependency:
-   - Is it listed in `rickshaw.json` files-from-controller (for runtime-transferred files)?
-   - Is it in the correct workshop JSON (for image-baked dependencies)?
-   - Are system package dependencies declared (`distro` requirements in workshop JSON)?
-   - Are `multiplex.json` entries present for new parameters?
-   - Do file paths in config files match actual file locations?
-   - Source files (`.c`, `.py`) should not be copied to `/usr/bin/` — only compiled binaries or executable scripts belong there.
+Report a finding only when all of the following are true:
 
-   **Pass 4 — Documentation:**
-   Check that docs match the code. For every behavioral change:
-   - Does the README parameter table reflect actual defaults and semantics?
-   - Does CLAUDE.md list new/renamed files accurately?
-   - Does help text (`--help` output) match the actual options?
-   - Are renamed or removed files updated in ALL documentation references? (Grep for the old name across the repo.)
-   - Do code comments accurately describe what the code does?
+- It is introduced by this change.
+- It is discrete and actionable.
+- It materially affects correctness, security, performance, compatibility, or maintainability.
+- A concrete input, state, environment, or deployment condition triggers it.
+- The author would likely fix it if they knew about it.
+- The conclusion does not depend on an unstated assumption about intent or environment.
+- It is not merely a linter/compiler/style result, typo, or optional refactoring.
 
-   **Pass 5 — Style & Convention:**
-   Check consistency with the existing codebase. Read surrounding code to learn patterns before flagging deviations:
-   - Indentation and formatting (check modelines if present)
-   - Variable naming conventions (lowercase_with_underscores vs camelCase — match what the file already uses)
-   - Error handling patterns (does the file use `exit_error`, `fprintf(stderr, ...)`, exceptions?)
-   - Shell: `[[ ]]` vs `[ ]`, deprecated operators (`-a`, `-o`)
-   - Do NOT report style preferences that differ from the codebase's existing conventions. Only flag deviations from what the codebase already does.
+Do not report pre-existing defects, intentional behavior changes, vague future risks, or missing tests by themselves. Report missing regression coverage only when the new behavior is high-risk or the repository's applicable instructions explicitly require the test.
 
-   **Pass 6 — Completeness:**
-   Check for files that SHOULD be in the diff but aren't. Passes 1–5 review files that ARE changed — this pass catches missing co-changes in files outside the diff.
+## Primary review passes
 
-   a. **CLAUDE.md co-change rules.** Read the repo's CLAUDE.md (if present). Look for co-change requirements — rules that say "when you change X, also update Y." For each rule, check whether the triggering condition is met by the actual changes in this PR (not just whether a listed file was touched). If the trigger applies and a required companion file is missing from the diff, that is a finding. Common co-change patterns include: CLI flag changes requiring help text + completions + implementation updates; config file changes requiring schema updates; behavioral changes requiring documentation updates.
+Use these passes in priority order. Keep an internal coverage matrix so every changed file and hunk is considered, but do not manufacture a finding for a file with no defect.
 
-   b. **Documentation cross-references.** Extract the key terms introduced or changed in the diff: new config keys, flag names, version strings, enum values. Grep `docs/` for these terms in files NOT already in the diff. Read each candidate file and confirm that its content is actually inconsistent with the PR's changes before reporting — do not flag a file just because it mentions a related concept.
+### 1. Dataflow, correctness, and contracts
 
-   c. **Deduplicate.** If a missing-file finding from this pass describes the same root cause as a finding from an earlier pass (e.g., Pass 4 flagged stale help text in a changed file, and this pass flags the same help file as absent from the diff), keep only the more actionable one.
+Trace non-trivial changes with concrete values and states. Check boundary and empty cases, arithmetic and time calculations, type and encoding conversions, error propagation, default values, state transitions, retries, cancellation, resource ownership, and concurrent access. For every changed API or parameter, verify declaration, propagation, validation, serialization, and use across all layers. Check callers and callees, format arguments, CLI option definitions, JSON schemas, and backward compatibility.
 
-6. **File coverage audit.** After all six passes, produce a checklist of EVERY file in the diff. For each file, state either the findings or "No issues found." If a file is missing from this list, the review is incomplete — go back and examine it. If Pass 6 identified missing files (files that should be in the diff but aren't), list them separately under a "Missing from diff" sub-heading.
+### 2. Security and trust boundaries
 
-7. **Classify findings by severity:**
-   - **Bug**: Incorrect behavior that WILL manifest at runtime. You must describe the specific scenario: what input or condition triggers it, and what goes wrong. If you cannot construct a triggering scenario, downgrade to Issue.
-   - **Issue**: Suboptimal but functional — missing validation, fragile assumption, potential future problem. State what would need to happen for this to become a real problem.
-   - **Doc**: Documentation inaccuracy, stale reference, or gap.
-   - **Style**: Convention deviation with no behavioral impact.
+Look specifically for credential or sensitive-data disclosure; shell, command, SQL, template, or path injection; unsafe deserialization; path traversal; authorization or authentication bypass; insecure temporary-file handling; privilege escalation; unsafe container/host or controller/engine boundaries; and sensitive data in logs, metadata, or error responses. Construct an actual triggering input before reporting a security finding.
 
-8. **Filter prior findings.** If a prior findings description was given (Question 2), remove any findings that describe the same issue. Do not re-report known problems.
+### 3. Integration and deployment
 
-9. **Output the report** in this format:
+Check the repository's actual build and runtime wiring. For Crucible benchmarks and tools, inspect applicable `rickshaw.json`, `workshop.json`, `multiplex.json`, schemas, controller-file transfer lists, and executable paths. For other repositories, use their own manifests, CI, packaging, and deployment conventions. Verify new files, dependencies, generated artifacts, configuration keys, migrations, and cross-repository interfaces are connected correctly. Do not apply Crucible-specific checks to repositories where they do not exist.
 
-   ```
-   ## PR Review: <repo>#<number> — <title>
+### 4. Failure, compatibility, and operational behavior
 
-   **Summary:** <one sentence describing what the PR does>
-   **Changed files:** <count>
-   **Review dimensions:** Correctness, API & Contracts, Build & Deploy, Documentation, Style, Completeness
+Check malformed input, partial failure, unavailable services, permissions, timeouts, retries, cleanup, restart/resume behavior, upgrades, rollback, mixed-version clients, concurrency, and resource exhaustion. Consider architecture-specific or container-specific paths when the diff affects them. A possible issue is not a finding until the affected path and trigger are demonstrated.
 
-   ### Bugs
-   - **[file:line] <description>** — <triggering scenario>
+### 5. Tests and validation
 
-   ### Issues
-   - **[file:line] <description>** — <what would need to happen>
-   - **[file] <description>** — (for Pass 6 findings about files absent from the diff, omit line number)
+Discover the repository's canonical commands from applicable instructions and CI. Run focused tests, schema validation, build checks, or targeted reproductions when practical; use bounded output capture for noisy commands. Run broader validation only when useful. Do not claim a test passed unless it was actually run. A test failure is evidence for a finding only after confirming it is caused by the change rather than the environment or a pre-existing failure.
 
-   ### Documentation
-   - **[file:line] <description>**
+## Optional Crucible audit
 
-   ### Style
-   - **[file:line] <description>**
+After the primary review, perform a separate, non-blocking audit when the repository or user request calls for it:
 
-   ### File Coverage
-   - [x] file1.c — 2 bugs, 1 issue
-   - [x] file2.py — No issues
-   - [x] file3.json — 1 doc issue
-   ...
+- Documentation and help text reflect changed behavior, defaults, flags, schemas, and file names.
+- Crucible CLI changes update the required help and completion locations.
+- Required companion files, schemas, image dependencies, and runtime transfer lists are present.
+- Relevant architecture and implementation guides remain accurate.
+- Style and comments match local conventions and explain intent.
 
-   Missing from diff:
-   - [ ] schema/services.json — description string needs v10dev added
-   ...
+Do not let documentation, cosmetic style, or ordinary missing-test observations obscure primary findings or change the verdict unless the user explicitly asks for that audit to be blocking. Only report a missing-from-diff item when its absence causes a concrete broken contract; attach it to the changed line that demonstrates the break.
 
-   ### Limitations
-   <what this review could NOT verify — e.g., runtime behavior, performance, hardware-specific paths>
+## History and prior review
 
-   ### Verdict
-   **<Approve | Approve with comments | Request changes>** — <one-line rationale>
-   ```
+Use `git log` or `git blame` selectively when code intent, compatibility, or a workaround is unclear. For GitHub PRs, inspect existing review comments and unresolved threads. Deduplicate findings by root cause and changed location. Do not treat a prior reviewer comment as proof that the current revision still has the problem; re-check the current head.
 
-   Omit any severity section that has zero findings (e.g., if there are no Style findings, omit that section entirely).
+## Severity and output
 
-10. **Verdict.** End the report with a clear verdict:
+Use priority labels for primary findings:
 
-   ```
-   ### Verdict
+- **P0** — universal release, data-loss, security, or operational blocker.
+- **P1** — serious realistic correctness or security defect that should block merge.
+- **P2** — meaningful defect or regression risk that should normally be fixed.
+- **P3** — minor but concrete issue; non-blocking unless project context makes it important.
 
-   **<verdict>** — <one-line rationale>
-   ```
+Each finding must have a short imperative title beginning with its priority, a changed-file line location, one concise paragraph explaining the trigger and impact, and a practical remedy. Include confidence when useful. Keep one finding per distinct root cause. Do not include speculative alternatives or long code excerpts, and do not provide a patch unless requested.
 
-   Use one of these three verdicts:
-   - **Approve** — no findings, or only style/cosmetic items that don't need changes before merge.
-   - **Approve with comments** — findings exist but none are blocking. The PR is functional and safe to merge; the findings are suggestions or minor doc fixes the author can address at their discretion.
-   - **Request changes** — at least one Bug or a blocking Issue that should be fixed before merge. State which specific finding(s) block approval.
+Use this report format:
 
-## Methodology Rules
+```text
+## PR Review: <repo>#<number> — <title>
 
-These rules govern how findings are evaluated. They are not suggestions — they are requirements.
+**Summary:** <one sentence>
+**Scope:** <PR, commit, base branch, or local changes>
+**Changed files:** <count>
 
-- **Read before judging.** Read every changed file completely before writing any findings. First impressions from diffs are often wrong because they lack context.
-- **Concrete over abstract.** "If `probe_rate=100` and `max_latency_ms=5`, the loop takes `2*5+1=11ms` per iteration, giving 90 probes/sec not 100" catches bugs. "The probe rate might not be accurate" does not.
-- **Callers and callees.** A parameter added in file A must be received in file B. A function signature change must be reflected at every call site. Grep for the function name across the repo.
-- **No false authority.** If you are unsure whether something is a bug, say so. "This MIGHT be wrong if X, but I cannot verify without Y" is more useful than a confident wrong answer.
-- **Codebase conventions win.** The existing code defines the style rules, not external style guides. If the file uses `[ ]` everywhere and one new line uses `[[ ]]`, that is a style finding. If the file uses `[[ ]]` everywhere, a new `[ ]` is the finding.
-- **Severity discipline.** Bugs must have triggering scenarios. Issues must have escalation conditions. Do not inflate severity to appear thorough.
+### Findings
+- **[P1] [path/to/file:line] Imperative finding title** — <concrete trigger, impact, and remedy>
 
-## False Positive Exclusions
+### Validation
+- <commands actually run and results>
+- <important limitations>
 
-Do NOT report any of the following — they produce noise, not value:
+### Supplemental audit
+- <only actionable documentation, deployment, or completeness items; omit when empty>
 
-- **Pre-existing issues.** Problems that exist in the codebase before this PR. The review scope is what this PR changes, not what was already broken.
-- **Issues on unmodified lines.** If the PR didn't touch it, don't flag it — even if the surrounding code has problems.
-- **Linter/compiler territory.** Missing imports, type mismatches, formatting, unused variables — tools catch these. Don't duplicate their work.
-- **Pedantic nitpicks.** Minor style preferences a senior engineer would not bother flagging in a real review.
-- **Intentional behavior changes.** If the PR's stated purpose is to change behavior X, don't flag "behavior X changed" as a bug.
+### File coverage
+- [x] <file> — <finding count or no primary findings>
 
-## Confidence Check
+### Verdict
+**<Request changes | Approve with comments | Approve>** — <one-line rationale>
+```
 
-After assembling all findings but before writing the final report, re-examine each one:
+Omit empty sections. Keep the file-coverage checklist concise; it is an audit trail, not a reason to add findings.
 
-- Can you construct a specific scenario that triggers it? (Bugs and Issues)
-- Does git history or the PR description explain why the code is written this way?
-- Is this something a senior engineer familiar with the codebase would flag?
+Use this verdict policy:
 
-Drop any finding where your confidence is low. A shorter report with high-confidence findings is more useful than a longer one padded with uncertain ones.
+- **Request changes** for any P0/P1 or another clearly merge-blocking defect.
+- **Approve with comments** for P2/P3 or supplemental findings that are actionable but non-blocking.
+- **Approve** when no primary findings remain after the confidence check.
+
+Before finalizing, re-check every finding against the exact head revision, changed-line requirement, finding gate, project instructions, and PR intent. Remove anything that is pre-existing, speculative, duplicate, non-actionable, or merely cosmetic.
