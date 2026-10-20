@@ -25,13 +25,17 @@ Before judging code, load the applicable project instructions. Starting at the r
 
 Read the PR description and linked issue context when available. Inspect relevant CI workflows, build files, schemas, and implementation guides only when they bear on the changed behavior. History is useful when intent is ambiguous, but do not run blanket `log` or `blame` passes over every file.
 
+For a GitHub PR, inspect the PR body and commit messages for explicit issue-closing references: `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, or `resolved` followed by an issue reference, such as `Fixes #123` or `Closes owner/repo#123`. These keywords are case-insensitive and may be followed by a colon. Resolve an unqualified reference against the PR repository and a fully qualified reference against the named repository. A plain issue URL or mention, such as `Related to #123`, is not a closing reference and does not trigger issue coverage.
+
+When closing references exist, inspect each referenced issue's available description and explicit acceptance criteria. Compare every clear stated requirement with behavior delivered by the PR, using its changes and relevant validation as evidence. Do not infer requirements from vague goals or ordinary issue links. If an issue is inaccessible, its reference cannot be resolved unambiguously, or a requirement cannot be assessed from available context, mark the affected issue or requirement inconclusive rather than assuming it is satisfied or unmet.
+
 ## Evidence and coverage
 
 1. Build a changed-file and changed-line map from the target's exact base-to-head diff.
 2. Read each changed hunk with enough surrounding context to understand the enclosing function, state machine, data structure, or configuration flow. Read an entire file when it is small or when cross-file context requires it; do not consume context reading large unrelated files wholesale.
 3. For changed functions, parameters, schemas, commands, and configuration keys, find callers, callees, consumers, and validation sites with repository-aware search. Follow symlinks or subproject boundaries when the architecture requires it.
-4. For every candidate finding, prove that the changed code introduces it. Check the base version, history, or an equivalent before/after execution path when necessary.
-5. Every primary finding must point to the shortest possible changed-line range that explains the defect. Do not report a problem only on an unchanged line or attach a finding to a file absent from the diff. If a missing companion file is the cause, attach the finding to the changed line that creates the broken contract and name the missing file in the explanation.
+4. For every code finding, prove that the changed code introduces it. Check the base version, history, or an equivalent before/after execution path when necessary. For issue coverage, verify the PR's explicit closing claim and compare it with the issue's stated requirements.
+5. Every primary code finding must point to the shortest possible changed-line range that explains the defect. Do not report a problem only on an unchanged line or attach a finding to a file absent from the diff. If a missing companion file is the cause, attach the finding to the changed line that creates the broken contract and name the missing file in the explanation. For issue coverage, the PR's explicit claim to close an issue is the behavior under review; a concrete unmet requirement does not need a changed code line.
 
 ## Finding gate
 
@@ -46,6 +50,8 @@ Report a finding only when all of the following are true:
 - It is not merely a linter/compiler/style result, typo, or optional refactoring.
 
 Do not report pre-existing defects, intentional behavior changes, vague future risks, or missing tests by themselves. Report missing regression coverage only when the new behavior is high-risk or the repository's applicable instructions explicitly require the test.
+
+For GitHub issue coverage, report a finding only for a concrete, clearly stated issue requirement that the PR explicitly claims to close but leaves unmet. This mismatch is considered introduced by the PR's closing claim. Apply the normal priority and verdict policy according to the impact of the unmet requirement; do not elevate a finding solely because the issue was linked or closed.
 
 ## Primary review passes
 
@@ -70,6 +76,12 @@ Check malformed input, partial failure, unavailable services, permissions, timeo
 ### 5. Tests and validation
 
 Discover the repository's canonical commands from applicable instructions and CI. Run focused tests, schema validation, build checks, or targeted reproductions when practical; use bounded output capture for noisy commands. Run broader validation only when useful. Do not claim a test passed unless it was actually run. A test failure is evidence for a finding only after confirming it is caused by the change rather than the environment or a pre-existing failure.
+
+### 6. Issue coverage (GitHub PRs)
+
+- If the PR has no explicit issue-closing references, omit issue coverage; ordinary issue links and mentions do not trigger it.
+- If closing references exist, include an `Issue coverage` section with an outcome for each referenced issue: **addressed**, **unmet**, or **inconclusive**. Mark an issue addressed only when all clear stated requirements are met. If any concrete requirement remains unmet, mark it unmet and report an issue-coverage finding. Mark inaccessible or ambiguous issue context inconclusive. If an issue has both a concrete unmet requirement and other requirements that cannot be assessed, report the unmet finding and note the remaining uncertainty.
+- Anchor an issue-coverage finding to the closing reference or issue URL; a changed-file line is not required. State the specific unmet requirement and its impact, then recommend the missing behavior or scope. Do not report vague or unstated expectations as unmet requirements.
 
 ## Optional Crucible audit
 
@@ -96,7 +108,7 @@ Use priority labels for primary findings:
 - **P2** — meaningful defect or regression risk that should normally be fixed.
 - **P3** — minor but concrete issue; non-blocking unless project context makes it important.
 
-Each finding must have a short imperative title beginning with its priority, a changed-file line location, one concise paragraph explaining the trigger and impact, and a practical remedy. Include confidence when useful. Keep one finding per distinct root cause. Do not include speculative alternatives or long code excerpts, and do not provide a patch unless requested.
+Each finding must have a short imperative title beginning with its priority, a location, one concise paragraph explaining the trigger and impact, and a practical remedy. Code findings use a changed-file line location; issue-coverage findings use the closing reference or issue URL. Include confidence when useful. Keep one finding per distinct root cause. Do not include speculative alternatives or long code excerpts, and do not provide a patch unless requested.
 
 Use this report format:
 
@@ -109,6 +121,9 @@ Use this report format:
 
 ### Findings
 - **[P1] [path/to/file:line] Imperative finding title** — <concrete trigger, impact, and remedy>
+
+### Issue coverage
+- `<closing reference>` — **addressed | unmet | inconclusive** — <brief requirement coverage or reason it cannot be assessed>
 
 ### Validation
 - <commands actually run and results>
@@ -132,4 +147,4 @@ Use this verdict policy:
 - **Approve with comments** for P2/P3 or supplemental findings that are actionable but non-blocking.
 - **Approve** when no primary findings remain after the confidence check.
 
-Before finalizing, re-check every finding against the exact head revision, changed-line requirement, finding gate, project instructions, and PR intent. Remove anything that is pre-existing, speculative, duplicate, non-actionable, or merely cosmetic.
+Before finalizing, re-check every finding against the exact head revision, location requirement, finding gate, project instructions, and PR intent. For issue-coverage findings, verify the closing reference and unmet requirement; a changed-line location is not required. Remove anything that is pre-existing, speculative, duplicate, non-actionable, or merely cosmetic.
