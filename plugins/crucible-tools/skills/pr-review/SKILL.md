@@ -93,7 +93,7 @@ After the primary review, perform a separate, non-blocking audit when the reposi
 - Relevant architecture and implementation guides remain accurate.
 - Style and comments match local conventions and explain intent.
 
-Do not let documentation, cosmetic style, or ordinary missing-test observations obscure primary findings or change the verdict unless the user explicitly asks for that audit to be blocking. Only report a missing-from-diff item when its absence causes a concrete broken contract; attach it to the changed line that demonstrates the break.
+Do not let documentation, cosmetic style, or ordinary missing-test observations obscure primary findings. Actionable supplemental findings may result in **Approve with comments**, but must not result in **Request changes** unless the user explicitly asks for that audit to be blocking. Only report a missing-from-diff item when its absence causes a concrete broken contract; attach it to the changed line that demonstrates the break.
 
 ## History and prior review
 
@@ -145,6 +145,6 @@ Use this verdict policy:
 
 - **Request changes** for any P0/P1 or another clearly merge-blocking defect.
 - **Approve with comments** for P2/P3 or supplemental findings that are actionable but non-blocking.
-- **Approve** when no primary findings remain after the confidence check.
+- **Approve** when no primary or actionable supplemental findings remain after the confidence check.
 
 Before finalizing, re-check every finding against the exact head revision, location requirement, finding gate, project instructions, and PR intent. For issue-coverage findings, verify the closing reference and unmet requirement; a changed-line location is not required. Remove anything that is pre-existing, speculative, duplicate, non-actionable, or merely cosmetic.
