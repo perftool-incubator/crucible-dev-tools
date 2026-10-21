@@ -133,6 +133,8 @@ Create a new repository in the perftool-incubator GitHub organization with stand
 
 6. Create branch protection rulesets:
 
+   GitHub ruleset branch patterns use glob-style `fnmatch` syntax, not regular expressions. Do not escape dots with backslashes; `20[2-9][0-9].[1234]` matches release branches such as `2026.1`.
+
    **default-branch ruleset** (`gh api repos/perftool-incubator/<repo>/rulesets --method POST`):
    ```json
    {
@@ -173,7 +175,7 @@ Create a new repository in the perftool-incubator GitHub organization with stand
      "enforcement": "active",
      "conditions": {
        "ref_name": {
-         "include": ["refs/heads/20[2-9][0-9]\\.[1234]", "refs/heads/ci-version-test"],
+         "include": ["refs/heads/20[2-9][0-9].[1234]", "refs/heads/ci-version-test"],
          "exclude": []
        }
      },
