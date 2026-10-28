@@ -46,9 +46,9 @@ Analyze crucible logs to debug a failed run or command.
 
    **Search for common failure patterns:**
    ```
-   crucible log view sessionid <session-id> --grep "(?i)(error|fail|abort|timeout)"
+   crucible log view sessionid <session-id> --grep "(?i)(error|fail|abort|timeout)" --tail 50
    ```
-   Run each query for every selected session ID.
+   Run each query for every selected session ID. The failure-pattern search is limited to 50 matching lines per session.
 
 5. If a run session is identified, also check:
 
@@ -65,13 +65,33 @@ Analyze crucible logs to debug a failed run or command.
 
    **Endpoint logs (for kube/remotehost failures):**
    ```
-   xzcat <run-directory>/run/endpoint/*/endpoint-stderrout.txt.xz | grep -i "error\|fail\|abort\|timeout" | tail -20
+   for endpoint_dir in <run-directory>/run/endpoint/*; do
+       [ -d "$endpoint_dir" ] || continue
+       plain_log="$endpoint_dir/endpoint-stderrout.txt"
+       compressed_log="${plain_log}.xz"
+       if [ -f "$plain_log" ]; then
+           cat "$plain_log"
+       elif [ -f "$compressed_log" ]; then
+           xzcat "$compressed_log"
+       fi
+   done | grep -i "error\|fail\|abort\|timeout" | tail -20
    ```
+   Endpoint logs may still be plain text while a run is active. Prefer the `.txt` file when present, fall back to `.txt.xz` after compression, and skip endpoints without either file. The search shows at most 20 matching lines.
 
    **Roadblock timeouts:**
    ```
-   xzcat <run-directory>/run/endpoint/*/endpoint-stderrout.txt.xz | grep -i "roadblock.*timeout\|CRITICAL"
+   for endpoint_dir in <run-directory>/run/endpoint/*; do
+       [ -d "$endpoint_dir" ] || continue
+       plain_log="$endpoint_dir/endpoint-stderrout.txt"
+       compressed_log="${plain_log}.xz"
+       if [ -f "$plain_log" ]; then
+           cat "$plain_log"
+       elif [ -f "$compressed_log" ]; then
+           xzcat "$compressed_log"
+       fi
+   done | grep -i "roadblock.*timeout\|CRITICAL" | tail -20
    ```
+   This search uses the same plain-file preference and compressed-file fallback, and shows at most 20 matching lines.
 
 6. Present findings as a summary:
    - What command was run and when
