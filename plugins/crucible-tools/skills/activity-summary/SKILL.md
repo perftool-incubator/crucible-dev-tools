@@ -1,4 +1,5 @@
 ---
+name: activity-summary
 description: Generate an activity summary for the perftool-incubator GitHub organization
 ---
 
@@ -90,6 +91,12 @@ Generate an activity summary for the perftool-incubator GitHub organization.
    gh api "search/issues?q=org:perftool-incubator+<author_q>+type:issue+created:${since_date}..${until_date}&per_page=100" --jq '.items[] | "[\(.repository_url | split("/") | .[-1])] \(.title) (#\(.number)) \(.user.login) \(.html_url)"'
    ```
 
+   For `audience_mode = "user"` and `completion_filter = "merged"`, use this completed-issues query instead of the "Issues created" query:
+   ```
+   gh api "search/issues?q=org:perftool-incubator+type:issue+closed:${since_date}..${until_date}&per_page=100" --jq '.items[] | "[\(.repository_url | split("/") | .[-1])] \(.title) (#\(.number)) \(.user.login) \(.html_url)"'
+   ```
+   Verify each issue is linked to a PR merged during the reporting period; do not treat a closed state alone as proof that the work was completed by a merged PR. When `author_mode` is `"user"`, require the closing PR author to match `author_filter`; do not filter by issue author.
+
    **Commits per repo** (iterate all repos in the org):
    ```
    repos=$(gh api search/repositories --method GET -f q="org:perftool-incubator" -f per_page=100 --jq '[.items[].name] | .[]')
@@ -117,7 +124,16 @@ Generate an activity summary for the perftool-incubator GitHub organization.
    If no Jira MCP server is available, skip this step entirely — do not error or warn.
 
 6. **Filter PRs and issues for user mode** (skip this step if `audience_mode` is `"developer"`):
-   
+
+   For `audience_mode = "user"`, set `completion_filter` to `"merged"` by default. Use `"all"` only when the user explicitly asks to include work that is still in progress. In `"merged"` mode, include a user-facing change only when it is completed:
+   - Include PRs only when they were merged during the reporting period. Exclude open and closed-unmerged PRs from themes, counts, and open-PR listings.
+   - Include GitHub issues only when they were closed during the period by a PR merged during the period. Exclude open issues and issues without a merged fix.
+   - Count commits only when they belong to an included merged PR; exclude commits on unmerged branches and direct commits without an included PR.
+   - Include Jira tickets only when their status is a completed state such as Closed, Done, or Resolved. They must still match the reporting-period query.
+   - In merged mode, count **PRs authored** as filtered user-facing PRs created during the period and merged during the period. Count **PRs merged** as all filtered user-facing PRs merged during the period, including ones opened earlier. The open-PR count is zero; omit or state that no open PRs qualify. Continue to skip the Reviews section when `author_mode` is `"all"`.
+
+   When `completion_filter = "all"`, retain the user-visible filtering below without the completion requirements.
+
    When `audience_mode` is `"user"`, filter the collected PRs, issues, and commits to include only user-visible changes:
    
    **Include PRs/issues with titles matching:**
