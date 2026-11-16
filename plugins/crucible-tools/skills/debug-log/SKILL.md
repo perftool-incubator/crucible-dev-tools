@@ -20,7 +20,8 @@ Analyze crucible logs to debug a failed run or command.
 
 2. **Process the answer:**
    - If "Last": analyze the most recent session
-   - If "Last N": ask a separate follow-up question for the count, require a positive integer, and analyze that many recent sessions
+   - If "Last N": ask a separate follow-up question for the count, require an integer from 1 through 50, and analyze that many recent sessions
+   - If the requested count is not an integer from 1 through 50, ask a follow-up for a valid count; do not process an unbounded session list
    - If "Specific": ask a separate follow-up question for the exact session ID, then analyze that session
    - If "Since": ask a separate follow-up question for a time range (for example, `1h`, `2d`, or `YYYY-MM-DD`), then analyze sessions from that time
    - Treat the initial answer as the selection mode only; it does not contain the count, ID, or time range. Do not continue until the required follow-up value is supplied.
@@ -30,7 +31,7 @@ Analyze crucible logs to debug a failed run or command.
    ```
    crucible log sessions --sort timestamp --order desc --format json | sed -n '1p'
    ```
-   For "Last N", use the same command with `sed -n '1,10p'`, replacing `10` with the requested count. For "Specific", use the supplied ID directly and inspect its targeted log output instead of listing all sessions. For "Since", filter the JSON-lines output locally by its `timestamp` field before displaying it; show only matching entries. Use each selected entry's `session_id`, `timestamp`, and `command` fields to guide diagnosis.
+   For "Last N", use the same command with `sed -n "1,${last_n}p"` and the validated `last_n` value from 1 through 50. For "Specific", use the supplied ID directly and inspect its targeted log output instead of listing all sessions. For "Since", filter the JSON-lines output locally by its `timestamp` field before displaying it; show only matching entries. Use each selected entry's `session_id`, `timestamp`, and `command` fields to guide diagnosis.
 
 4. For the target session(s), gather diagnostic information:
 
