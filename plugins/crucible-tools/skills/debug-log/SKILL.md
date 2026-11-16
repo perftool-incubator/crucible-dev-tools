@@ -31,7 +31,7 @@ Analyze crucible logs to debug a failed run or command.
    ```
    crucible log sessions --sort timestamp --order desc --format json | sed -n '1p'
    ```
-   For "Last N", use the same command with `sed -n "1,${last_n}p"` and the validated `last_n` value from 1 through 50. For "Specific", use the supplied ID directly and inspect its targeted log output instead of listing all sessions. For "Since", filter the JSON-lines output locally by its `timestamp` field before displaying it; show only matching entries. Use each selected entry's `session_id`, `timestamp`, and `command` fields to guide diagnosis.
+   For "Last N", use the same command with `sed -n "1,${last_n}p"` and the validated `last_n` value from 1 through 50. For "Specific", use the supplied ID directly and inspect its targeted log output instead of listing all sessions. For "Since", filter the JSON-lines output locally by its `timestamp` field, then retain only the 50 most recent matching entries because the command already sorts sessions in descending timestamp order; pipe the filtered output through `sed -n '1,50p'`. If more than 50 sessions match the requested range, report that older matching sessions are omitted. Use each selected entry's `session_id`, `timestamp`, and `command` fields to guide diagnosis.
 
 4. For the target session(s), gather diagnostic information:
 
