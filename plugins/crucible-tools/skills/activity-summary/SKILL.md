@@ -71,7 +71,7 @@ Generate an activity summary for the perftool-incubator GitHub organization.
 
    **PRs merged** (merged in the date range):
    ```
-   gh api "search/issues?q=org:perftool-incubator+<author_q>+type:pr+merged:${since_date}..${until_date}&per_page=100" --jq '.total_count'
+   gh api "search/issues?q=org:perftool-incubator+<author_q>+type:pr+merged:${since_date}..${until_date}&per_page=100" --jq '.items[]'
    ```
 
    **Open PRs**:
@@ -105,6 +105,12 @@ Generate an activity summary for the perftool-incubator GitHub organization.
        # only report repos with count > 0
    done
    ```
+
+   For `audience_mode = "user"` and `completion_filter = "merged"`, do not use the repository-wide commit query for the final commit counts. Apply the author and user-visibility filters to the merged-PR records first, then collect commits from each included PR:
+   ```
+   gh api "repos/perftool-incubator/${repository}/pulls/${pull_number}/commits?per_page=100&page=${page}" --jq '.[] | .sha'
+   ```
+   Paginate each PR's commit list until a response contains fewer than 100 commits. Deduplicate commit SHAs per repository before calculating the commits-by-repo counts. This excludes direct commits and commits from unmerged or filtered-out PRs.
 
 5. **Jira tickets (optional):** If a Jira MCP server is available (check for tools with names starting with `mcp__jira__`), collect tickets updated or created during the date range:
 
