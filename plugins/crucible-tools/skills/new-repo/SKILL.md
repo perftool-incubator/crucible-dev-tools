@@ -131,14 +131,16 @@ Create a new repository in the perftool-incubator GitHub organization with stand
    gh api orgs/perftool-incubator/teams/maintainers/repos/perftool-incubator/<repo> --method PUT -f permission=maintain
    ```
 
-6. Create branch protection rulesets:
+6. Create the canonical four branch protection rulesets:
 
    GitHub ruleset branch patterns use glob-style `fnmatch` syntax, not regular expressions. Do not escape dots with backslashes; `20[2-9][0-9].[1234]` matches release branches such as `2026.1`.
 
-   **default-branch ruleset** (`gh api repos/perftool-incubator/<repo>/rulesets --method POST`):
+   Use actor ID `20646239` for the `Bypass Administrators` team and actor ID `962037` for the `crucible-ci` GitHub App. The Bypass Administrators team must be the only human bypass actor, and its bypass mode must be `pull_request`.
+
+   **default-branch-required ruleset** (`gh api repos/perftool-incubator/<repo>/rulesets --method POST`):
    ```json
    {
-     "name": "default-branch",
+     "name": "default-branch-required",
      "target": "branch",
      "enforcement": "active",
      "conditions": {
@@ -153,10 +155,11 @@ Create a new repository in the perftool-incubator GitHub organization with stand
        {
          "type": "pull_request",
          "parameters": {
-           "required_approving_review_count": 1,
+           "required_approving_review_count": 0,
            "dismiss_stale_reviews_on_push": true,
            "required_reviewers": [],
            "require_code_owner_review": false,
+           "require_extra_approval_for_unattributed_changes": true,
            "require_last_push_approval": false,
            "required_review_thread_resolution": true,
            "allowed_merge_methods": ["merge"]
@@ -167,10 +170,47 @@ Create a new repository in the perftool-incubator GitHub organization with stand
    }
    ```
 
-   **releases ruleset** (`gh api repos/perftool-incubator/<repo>/rulesets --method POST`):
+   **default-branch-bypassable ruleset** (`gh api repos/perftool-incubator/<repo>/rulesets --method POST`):
    ```json
    {
-     "name": "releases",
+     "name": "default-branch-bypassable",
+     "target": "branch",
+     "enforcement": "active",
+     "conditions": {
+       "ref_name": {
+         "include": ["~DEFAULT_BRANCH"],
+         "exclude": []
+       }
+     },
+     "rules": [
+       {
+         "type": "pull_request",
+         "parameters": {
+           "required_approving_review_count": 1,
+           "dismiss_stale_reviews_on_push": true,
+           "required_reviewers": [],
+           "require_code_owner_review": false,
+           "require_extra_approval_for_unattributed_changes": true,
+           "require_last_push_approval": false,
+           "required_review_thread_resolution": false,
+           "allowed_merge_methods": ["merge"]
+         }
+       }
+     ],
+     "bypass_actors": [
+       {
+         "actor_id": 20646239,
+         "actor_type": "Team",
+         "bypass_mode": "pull_request"
+       }
+     ]
+   }
+   ```
+
+   **releases-required ruleset** (`gh api repos/perftool-incubator/<repo>/rulesets --method POST`):
+   ```json
+   {
+     "name": "releases-required",
      "target": "branch",
      "enforcement": "active",
      "conditions": {
@@ -185,10 +225,11 @@ Create a new repository in the perftool-incubator GitHub organization with stand
        {
          "type": "pull_request",
          "parameters": {
-           "required_approving_review_count": 1,
+           "required_approving_review_count": 0,
            "dismiss_stale_reviews_on_push": true,
            "required_reviewers": [],
            "require_code_owner_review": false,
+           "require_extra_approval_for_unattributed_changes": true,
            "require_last_push_approval": false,
            "required_review_thread_resolution": true,
            "allowed_merge_methods": ["merge"]
@@ -205,10 +246,55 @@ Create a new repository in the perftool-incubator GitHub organization with stand
    }
    ```
 
+   **releases-bypassable ruleset** (`gh api repos/perftool-incubator/<repo>/rulesets --method POST`):
+   ```json
+   {
+     "name": "releases-bypassable",
+     "target": "branch",
+     "enforcement": "active",
+     "conditions": {
+       "ref_name": {
+         "include": ["refs/heads/20[2-9][0-9].[1234]", "refs/heads/ci-version-test"],
+         "exclude": []
+       }
+     },
+     "rules": [
+       {"type": "deletion"},
+       {
+         "type": "pull_request",
+         "parameters": {
+           "required_approving_review_count": 1,
+           "dismiss_stale_reviews_on_push": true,
+           "required_reviewers": [],
+           "require_code_owner_review": false,
+           "require_extra_approval_for_unattributed_changes": true,
+           "require_last_push_approval": false,
+           "required_review_thread_resolution": false,
+           "allowed_merge_methods": ["merge"]
+         }
+       }
+     ],
+     "bypass_actors": [
+       {
+         "actor_id": 962037,
+         "actor_type": "Integration",
+         "bypass_mode": "always"
+       },
+       {
+         "actor_id": 20646239,
+         "actor_type": "Team",
+         "bypass_mode": "pull_request"
+       }
+     ]
+   }
+   ```
+
+   After creating the rulesets, fetch them and verify that each required ruleset reports `current_user_can_bypass: "never"` and each bypassable ruleset reports `current_user_can_bypass: "pull_requests_only"`.
+
 7. Back up the rulesets into the repo:
    - Fetch each ruleset via `gh api repos/perftool-incubator/<repo>/rulesets/<id>`
    - Strip metadata fields (`node_id`, `created_at`, `updated_at`, `current_user_can_bypass`, `_links`)
-   - Save to `.github/rulesets/branches/default-branch.json` and `.github/rulesets/branches/releases.json`
+   - Save to `.github/rulesets/branches/default-branch-required.json`, `.github/rulesets/branches/default-branch-bypassable.json`, `.github/rulesets/branches/releases-required.json`, and `.github/rulesets/branches/releases-bypassable.json`
    - Add `.github/rulesets/README.md` with content: `The files stored here are for documentation / tracking purposes only.  They must be loaded into the GitHub web GUI to be "active" -- their presence here does not result in any behavioral changes by GitHub.`
 
 8. Commit the ruleset backups on a feature branch, create a PR requesting review from the Developers team, and self-assign.
