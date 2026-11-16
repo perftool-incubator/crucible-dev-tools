@@ -71,8 +71,9 @@ Generate an activity summary for the perftool-incubator GitHub organization.
 
    **PRs merged** (merged in the date range):
    ```
-   gh api "search/issues?q=org:perftool-incubator+<author_q>+type:pr+merged:${since_date}..${until_date}&per_page=100" --jq '.items[]'
+   gh api --paginate "search/issues?q=org:perftool-incubator+<author_q>+type:pr+merged:${since_date}..${until_date}&per_page=100" --jq '.items[]'
    ```
+   Before paginating, query the same window with `per_page=1` and inspect `.total_count`. If the count exceeds 1,000, recursively split the date range into smaller non-overlapping windows until each window reports at most 1,000 results. Split date ranges on day boundaries, for example `START..MID` and the day after `MID` through `END`, so no date is duplicated or omitted. Run the paginated query for every final window and deduplicate the returned PR records by `node_id` across pages and windows. If a single-day window still reports more than 1,000 results, retain at most the 1,000 results GitHub Search returns and report that ceiling-limited truncation.
 
    **Open PRs**:
    ```
@@ -93,8 +94,9 @@ Generate an activity summary for the perftool-incubator GitHub organization.
 
    For `audience_mode = "user"` and `completion_filter = "merged"`, use this completed-issues query instead of the "Issues created" query:
    ```
-   gh api "search/issues?q=org:perftool-incubator+type:issue+closed:${since_date}..${until_date}&per_page=100" --jq '.items[] | "[\(.repository_url | split("/") | .[-1])] \(.title) (#\(.number)) \(.user.login) \(.html_url)"'
+   gh api --paginate "search/issues?q=org:perftool-incubator+type:issue+closed:${since_date}..${until_date}&per_page=100" --jq '.items[] | {node_id, repository: (.repository_url | split("/") | .[-1]), title, number, user: .user.login, html_url, closed_at}'
    ```
+   Apply the same `total_count` check, recursive non-overlapping date-window split, `--paginate` collection, and `node_id` deduplication as for merged PRs. If a single-day window remains above GitHub Search's 1,000-result ceiling, retain at most the returned 1,000 records and report the truncation.
    Verify each issue is linked to a PR merged during the reporting period; do not treat a closed state alone as proof that the work was completed by a merged PR. When `author_mode` is `"user"`, require the closing PR author to match `author_filter`; do not filter by issue author.
 
    **Commits per repo** (iterate all repos in the org):
