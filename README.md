@@ -13,6 +13,12 @@ claude plugin marketplace add ${CRUCIBLE_HOME}/subprojects/core/crucible-dev-too
 
 Claude Code will prompt you to install the crucible-tools plugin — accept it.
 
+## Maintenance
+
+Any change under `plugins/crucible-tools/` must bump `version` in
+`plugins/crucible-tools/.claude-plugin/plugin.json` and refresh installed
+plugin caches in the same change.
+
 ## Skills
 
 | Skill | Description |
